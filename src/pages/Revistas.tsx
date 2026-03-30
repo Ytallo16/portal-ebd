@@ -1,23 +1,43 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { turmas, controleRevistas } from "@/data/mock";
-import { Search, BookMarked, CheckCircle, Clock, XCircle, ArrowLeft } from "lucide-react";
+import { Search, BookMarked, CheckCircle, Clock, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fetchPublicationControls, fetchTurmas, updatePublicationControl } from "@/lib/portalApi";
 
 export default function Revistas() {
+  const queryClient = useQueryClient();
   const [selectedTurma, setSelectedTurma] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { data: controleRevistas = [], isLoading: loadingRevistas } = useQuery({
+    queryKey: ["revistas", selectedTurma],
+    queryFn: () => fetchPublicationControls(selectedTurma ?? undefined),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: { recebeu?: boolean; pagou?: boolean } }) =>
+      updatePublicationControl(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["revistas"] });
+    },
+  });
+
+  if (loadingTurmas || loadingRevistas) {
+    return <p className="text-sm text-muted-foreground">Carregando revistas...</p>;
+  }
 
   if (!selectedTurma) {
     return (
       <div className="space-y-6 animate-fade-in">
         <h1 className="text-2xl font-bold">Revistas</h1>
         <p className="text-sm text-muted-foreground">Selecione uma turma para gerenciar as revistas</p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {turmas.map((t) => (
             <Card
               key={t.id}
@@ -54,9 +74,9 @@ export default function Revistas() {
   const pendentes = revistas.filter((r) => r.recebeu && !r.pagou).length;
 
   const getStatus = (r: typeof revistas[0]) => {
-    if (!r.recebeu) return { label: "Não recebeu", icon: XCircle, variant: "destructive" as const };
-    if (r.pagou) return { label: "Regular", icon: CheckCircle, variant: "default" as const };
-    return { label: "Pendente", icon: Clock, variant: "secondary" as const };
+    if (!r.recebeu) return { label: "Não recebeu", variant: "destructive" as const };
+    if (r.pagou) return { label: "Regular", variant: "default" as const };
+    return { label: "Pendente", variant: "secondary" as const };
   };
 
   const renderTable = (list: typeof revistas) => (
@@ -64,18 +84,24 @@ export default function Revistas() {
       {filterList(list).map((r) => {
         const status = getStatus(r);
         return (
-          <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-            <div className="flex-1 min-w-0">
+        <div key={r.id} className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
               <p className="font-medium text-sm truncate">{r.nome}</p>
             </div>
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 shrink-0">
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="text-muted-foreground">Recebeu</span>
-                <Switch checked={r.recebeu} />
+                <Switch
+                  checked={r.recebeu}
+                  onCheckedChange={(value) => toggleMutation.mutate({ id: r.id, payload: { recebeu: value } })}
+                />
               </div>
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="text-muted-foreground">Pagou</span>
-                <Switch checked={r.pagou} />
+                <Switch
+                  checked={r.pagou}
+                  onCheckedChange={(value) => toggleMutation.mutate({ id: r.id, payload: { pagou: value } })}
+                />
               </div>
               <Badge variant={status.variant} className="text-xs">{status.label}</Badge>
             </div>
@@ -87,11 +113,11 @@ export default function Revistas() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button variant="ghost" size="icon" className="touch-target" onClick={() => setSelectedTurma(null)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">Revistas — {turma.nome}</h1>
+        <h1 className="text-2xl font-bold break-words">Revistas — {turma.nome}</h1>
       </div>
 
       <div className="relative">
@@ -99,7 +125,7 @@ export default function Revistas() {
         <Input placeholder="Buscar por nome..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 touch-target" />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {[
           { label: "Total", value: total, icon: BookMarked },
           { label: "Entregues", value: entregues, icon: CheckCircle },
@@ -119,7 +145,7 @@ export default function Revistas() {
       </div>
 
       <Tabs defaultValue="professores">
-        <TabsList className="touch-target">
+        <TabsList className="touch-target w-full justify-start overflow-x-auto">
           <TabsTrigger value="professores" className="touch-target">Professores</TabsTrigger>
           <TabsTrigger value="alunos" className="touch-target">Alunos</TabsTrigger>
         </TabsList>

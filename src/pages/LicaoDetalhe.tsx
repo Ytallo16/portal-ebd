@@ -1,40 +1,71 @@
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BookOpen, BookMarked, DollarSign, CheckCircle, XCircle } from "lucide-react";
-import { licoes, turmas, formatDate, formatCurrency } from "@/data/mock";
+import { fetchAttendanceSheets, fetchLicaoById, fetchOfferings, fetchTurmas } from "@/lib/portalApi";
+import { formatCurrency, formatDate } from "@/lib/formatters";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
-const chamadaPorClasse = turmas.slice(0, 8).map((t) => ({
-  turma: t.nome.length > 10 ? t.nome.slice(0, 10) + "…" : t.nome,
-  turmaId: t.id,
-  presentes: Math.floor(t.totalAlunos * (0.7 + Math.random() * 0.25)),
-  ausentes: Math.floor(t.totalAlunos * 0.15),
-}));
-
-const professoresPresenca = [
-  { nome: "José Ferreira", presente: true },
-  { nome: "Lucas Oliveira", presente: true },
-  { nome: "Maria Silva", presente: false },
-  { nome: "Marcos Santos", presente: true },
-  { nome: "Ana Souza", presente: true },
-];
-
 export default function LicaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const licao = licoes.find((l) => l.id === id);
 
-  if (!licao) return <p>Lição não encontrada.</p>;
+  const { data: licao, isLoading: loadingLicao } = useQuery({
+    queryKey: ["licao", id],
+    queryFn: () => fetchLicaoById(id ?? ""),
+    enabled: Boolean(id),
+  });
+  const { data: turmas = [] } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { data: offerings = [] } = useQuery({ queryKey: ["offerings"], queryFn: () => fetchOfferings() });
+  const { data: sheets = [] } = useQuery({ queryKey: ["attendance-sheets"], queryFn: fetchAttendanceSheets });
 
-  const totalPresentes = licao.presentes;
-  const totalAusentes = licao.ausentes;
+  const chamadaPorClasse = useMemo(() => {
+    if (!id) return [];
+
+    return turmas
+      .map((t) => {
+        const sheet = sheets.find((s) => s.lesson === id && s.classGroup === t.id);
+        const presentes = sheet?.records.filter((r) => r.presente).length ?? 0;
+        const ausentes = sheet?.records.filter((r) => !r.presente).length ?? 0;
+        return {
+          turma: t.nome.length > 10 ? `${t.nome.slice(0, 10)}…` : t.nome,
+          turmaId: t.id,
+          presentes,
+          ausentes,
+          biblias: sheet?.biblias ?? 0,
+          revistas: sheet?.revistas ?? 0,
+          oferta: sheet?.ofertaValor ?? 0,
+        };
+      })
+      .filter((c) => c.presentes > 0 || c.ausentes > 0);
+  }, [id, turmas, sheets]);
+
+  const totalPresentes = chamadaPorClasse.reduce((acc, item) => acc + item.presentes, 0) || licao?.presentes || 0;
+  const totalAusentes = chamadaPorClasse.reduce((acc, item) => acc + item.ausentes, 0) || licao?.ausentes || 0;
+  const totalBiblias = chamadaPorClasse.reduce((acc, item) => acc + item.biblias, 0);
+  const totalRevistas = chamadaPorClasse.reduce((acc, item) => acc + item.revistas, 0);
+  const totalOfertas = offerings
+    .filter((o) => o.licaoId === id)
+    .reduce((acc, item) => acc + item.valor, 0) + chamadaPorClasse.reduce((acc, item) => acc + item.oferta, 0);
+
   const pctPresenca = totalPresentes + totalAusentes > 0
     ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100)
     : 0;
+
+  const professoresPresenca = turmas
+    .flatMap((t) => t.professores.map((nome) => ({ nome, presente: chamadaPorClasse.some((c) => c.turmaId === t.id) })))
+    .slice(0, 8);
+
+  if (loadingLicao) {
+    return <p className="text-sm text-muted-foreground">Carregando lição...</p>;
+  }
+
+  if (!licao) return <p>Lição não encontrada.</p>;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -51,13 +82,12 @@ export default function LicaoDetalhe() {
         </div>
       </div>
 
-      {/* KPI cards */}
       <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <BookOpen className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-xl font-bold">142</p>
+              <p className="text-xl font-bold">{totalBiblias}</p>
               <p className="text-xs text-muted-foreground">Bíblias</p>
             </div>
           </CardContent>
@@ -66,7 +96,7 @@ export default function LicaoDetalhe() {
           <CardContent className="flex items-center gap-3 p-4">
             <BookMarked className="h-5 w-5 text-secondary" />
             <div>
-              <p className="text-xl font-bold">128</p>
+              <p className="text-xl font-bold">{totalRevistas}</p>
               <p className="text-xs text-muted-foreground">Revistas</p>
             </div>
           </CardContent>
@@ -75,14 +105,13 @@ export default function LicaoDetalhe() {
           <CardContent className="flex items-center gap-3 p-4">
             <DollarSign className="h-5 w-5 text-success" />
             <div>
-              <p className="text-xl font-bold">{formatCurrency(285)}</p>
+              <p className="text-xl font-bold">{formatCurrency(totalOfertas)}</p>
               <p className="text-xs text-muted-foreground">Ofertas</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -136,7 +165,6 @@ export default function LicaoDetalhe() {
         </Card>
       </div>
 
-      {/* Chamadas por Classe table */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Chamadas por Classe</CardTitle>
@@ -162,7 +190,7 @@ export default function LicaoDetalhe() {
                   <td className="p-2 text-center text-success">{c.presentes}</td>
                   <td className="p-2 text-center text-destructive">{c.ausentes}</td>
                   <td className="p-2 text-center">
-                    {Math.round((c.presentes / (c.presentes + c.ausentes)) * 100)}%
+                    {Math.round((c.presentes / Math.max(c.presentes + c.ausentes, 1)) * 100)}%
                   </td>
                 </tr>
               ))}
@@ -171,7 +199,6 @@ export default function LicaoDetalhe() {
         </CardContent>
       </Card>
 
-      {/* Professores */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Presença dos Professores</CardTitle>

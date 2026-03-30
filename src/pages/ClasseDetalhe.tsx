@@ -1,30 +1,45 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, BookOpen, BookMarked, DollarSign, Users, UserPlus } from "lucide-react";
-import { turmas, licoes, alunos, getIniciais, formatCurrency } from "@/data/mock";
+import { fetchAttendanceByLessonClass, fetchAlunos, fetchLicaoById, fetchOfferings, fetchTurmas } from "@/lib/portalApi";
+import { formatCurrency, getIniciais } from "@/lib/formatters";
 
 export default function ClasseDetalhe() {
   const { id, classId } = useParams();
   const navigate = useNavigate();
 
+  const { data: turmas = [] } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { data: licao } = useQuery({ queryKey: ["licao", id], queryFn: () => fetchLicaoById(id ?? ""), enabled: Boolean(id) });
+  const { data: alunos = [] } = useQuery({ queryKey: ["alunos"], queryFn: () => fetchAlunos() });
+  const { data: attendance } = useQuery({
+    queryKey: ["attendance-classe", id, classId],
+    queryFn: () => fetchAttendanceByLessonClass(id ?? "", classId ?? ""),
+    enabled: Boolean(id && classId),
+  });
+  const { data: offerings = [] } = useQuery({ queryKey: ["offerings"], queryFn: () => fetchOfferings(classId) });
+
   const turma = turmas.find((t) => t.id === classId);
-  const licao = licoes.find((l) => l.id === id);
   const alunosDaTurma = alunos.filter((a) => a.turmaId === classId);
+
+  const chamada = useMemo(() => {
+    if (attendance?.records?.length) {
+      return attendance.records.map((r: any) => ({ id: String(r.student), nome: r.aluno_nome, presente: r.presente }));
+    }
+    return alunosDaTurma.map((a) => ({ ...a, presente: false }));
+  }, [attendance, alunosDaTurma]);
 
   if (!turma || !licao) return <p>Não encontrado.</p>;
 
-  const presentes = Math.floor(turma.totalAlunos * 0.8);
-  const ausentes = turma.totalAlunos - presentes;
-  const pct = Math.round((presentes / turma.totalAlunos) * 100);
-
-  // Mock chamada
-  const chamada = alunosDaTurma.map((a, i) => ({
-    ...a,
-    presente: i % 5 !== 0,
-  }));
+  const presentes = chamada.filter((a) => a.presente).length;
+  const ausentes = chamada.length - presentes;
+  const pct = Math.round((presentes / Math.max(chamada.length, 1)) * 100);
+  const totalOferta = offerings.reduce((acc, o) => acc + o.valor, 0) + Number(attendance?.oferta_valor ?? 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -37,19 +52,18 @@ export default function ClasseDetalhe() {
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <Badge variant="outline">Lição {licao.numero}</Badge>
             <Badge variant={licao.status === "Finalizada" ? "default" : "secondary"}>{licao.status}</Badge>
-            <span className="text-sm text-muted-foreground">Prof: {turma.professores.join(", ")}</span>
+            <span className="text-sm text-muted-foreground">Prof: {turma.professores.join(", ") || "—"}</span>
           </div>
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { icon: Users, label: "Frequência", value: `${pct}% (${presentes}/${turma.totalAlunos})` },
-          { icon: BookOpen, label: "Bíblias", value: String(presentes - 2) },
-          { icon: BookMarked, label: "Revistas", value: String(presentes - 4) },
-          { icon: UserPlus, label: "Visitantes", value: "2" },
-          { icon: DollarSign, label: "Ofertas", value: formatCurrency(45) },
+          { icon: Users, label: "Frequência", value: `${pct}% (${presentes}/${Math.max(chamada.length, 0)})` },
+          { icon: BookOpen, label: "Bíblias", value: String(attendance?.biblias ?? 0) },
+          { icon: BookMarked, label: "Revistas", value: String(attendance?.revistas ?? 0) },
+          { icon: UserPlus, label: "Visitantes", value: String(attendance?.visitantes ?? 0) },
+          { icon: DollarSign, label: "Ofertas", value: formatCurrency(totalOferta) },
         ].map((k) => (
           <Card key={k.label}>
             <CardContent className="p-3 flex items-center gap-2">
@@ -63,7 +77,6 @@ export default function ClasseDetalhe() {
         ))}
       </div>
 
-      {/* Info da lição */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Informações da Lição</CardTitle>
@@ -76,7 +89,6 @@ export default function ClasseDetalhe() {
         </CardContent>
       </Card>
 
-      {/* Chamada */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Lista de Chamada</CardTitle>

@@ -1,11 +1,18 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { usuarioLogado } from "@/data/mock";
+import { fetchUsuarioLogado } from "@/lib/portalApi";
 
 export default function MeuPerfil() {
+  const { data: usuarioLogado, isLoading } = useQuery({ queryKey: ["me"], queryFn: fetchUsuarioLogado });
+
+  if (isLoading || !usuarioLogado) {
+    return <p className="text-sm text-muted-foreground">Carregando perfil...</p>;
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in max-w-md mx-auto mt-8">
+    <div className="mx-auto mt-4 w-full max-w-md space-y-6 animate-fade-in px-2 sm:mt-8 sm:px-0">
       <h1 className="text-2xl font-bold">Meu Perfil</h1>
       <Card>
         <CardContent className="flex flex-col items-center gap-4 p-8">

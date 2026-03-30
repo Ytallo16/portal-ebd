@@ -5,67 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Search, Building2, Landmark, Building, CheckCircle2, XCircle } from "lucide-react";
-
-interface Organizacao {
-  id: string;
-  nome: string;
-  sigla: string;
-  tipo: "Sede" | "Filial" | "Congregação";
-  cidade: string;
-  uf: string;
-  responsavel: string;
-  membros: number;
-  status: "Ativa" | "Inativa";
-}
-
-const organizacoesIniciais: Organizacao[] = [
-  {
-    id: "org-1",
-    nome: "AD Dirceu",
-    sigla: "ADD",
-    tipo: "Sede",
-    cidade: "Teresina",
-    uf: "PI",
-    responsavel: "Pr. Daniel Nascimento",
-    membros: 1240,
-    status: "Ativa",
-  },
-  {
-    id: "org-2",
-    nome: "AD Grande Dirceu II",
-    sigla: "ADD-II",
-    tipo: "Filial",
-    cidade: "Teresina",
-    uf: "PI",
-    responsavel: "Pr. Marcos Santos",
-    membros: 510,
-    status: "Ativa",
-  },
-  {
-    id: "org-3",
-    nome: "Congregação Vila Nova",
-    sigla: "CVN",
-    tipo: "Congregação",
-    cidade: "Teresina",
-    uf: "PI",
-    responsavel: "Dc. José Ferreira",
-    membros: 220,
-    status: "Ativa",
-  },
-  {
-    id: "org-4",
-    nome: "Congregação Cristo Vive",
-    sigla: "CCV",
-    tipo: "Congregação",
-    cidade: "Timon",
-    uf: "MA",
-    responsavel: "Pb. Samuel Barbosa",
-    membros: 135,
-    status: "Inativa",
-  },
-];
+import { useNavigate } from "react-router-dom";
+import { organizacoesIniciais, type Organizacao } from "@/pages/organizacoesData";
 
 export default function Organizacoes() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [organizacoes, setOrganizacoes] = useState<Organizacao[]>(organizacoesIniciais);
 
@@ -117,7 +61,7 @@ export default function Organizacoes() {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Building2 className="h-5 w-5 text-primary" />
@@ -156,16 +100,20 @@ export default function Organizacoes() {
         </Card>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {organizacoesFiltradas.map((organizacao) => (
-          <Card key={organizacao.id}>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-accent text-accent-foreground flex items-center justify-center">
-                    {organizacao.tipo === "Sede" ? <Landmark className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
-                  </div>
-                  <div>
+          <Card
+            key={organizacao.id}
+            className="cursor-pointer transition-all hover:ring-2 hover:ring-primary/40"
+            onClick={() => navigate(`/configuracoes/organizacoes/${organizacao.id}`)}
+          >
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-accent text-accent-foreground flex items-center justify-center">
+                      {organizacao.tipo === "Sede" ? <Landmark className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
+                    </div>
+                  <div className="min-w-0">
                     <p className="font-semibold">{organizacao.nome}</p>
                     <p className="text-xs text-muted-foreground">
                       {organizacao.sigla} • {organizacao.cidade}/{organizacao.uf}
@@ -177,7 +125,7 @@ export default function Organizacoes() {
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Tipo</p>
                   <p className="font-medium">{organizacao.tipo}</p>
@@ -186,7 +134,7 @@ export default function Organizacoes() {
                   <p className="text-xs text-muted-foreground">Membros</p>
                   <p className="font-medium">{organizacao.membros}</p>
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <p className="text-xs text-muted-foreground">Responsável</p>
                   <p className="font-medium">{organizacao.responsavel}</p>
                 </div>
@@ -196,13 +144,26 @@ export default function Organizacoes() {
                 <span className="text-xs text-muted-foreground">Portal habilitado para a organização</span>
                 <Switch
                   checked={organizacao.status === "Ativa"}
+                  onClick={(e) => e.stopPropagation()}
                   onCheckedChange={(checked) => alternarStatus(organizacao.id, checked)}
                 />
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="touch-target flex-1">Editar</Button>
-                <Button variant="ghost" size="sm" className="touch-target flex-1">Gerenciar acesso</Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" size="sm" className="touch-target flex-1" onClick={(e) => e.stopPropagation()}>
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="touch-target flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/configuracoes/organizacoes/${organizacao.id}`);
+                  }}
+                >
+                  Ver detalhes
+                </Button>
               </div>
             </CardContent>
           </Card>

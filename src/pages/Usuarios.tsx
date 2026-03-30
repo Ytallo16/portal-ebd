@@ -1,25 +1,38 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { usuarios, getIniciais } from "@/data/mock";
 import { Search, Users, UserCheck, UserX } from "lucide-react";
+import { fetchUsuarios, toggleUserActive } from "@/lib/portalApi";
+import { getIniciais } from "@/lib/formatters";
 
 export default function Usuarios() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+
+  const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
+  const toggleMutation = useMutation({
+    mutationFn: (userId: string) => toggleUserActive(userId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["usuarios"] }),
+  });
 
   const filtered = usuarios.filter(
     (u) =>
       u.nome.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.papel.toLowerCase().includes(search.toLowerCase())
+      u.papel.toLowerCase().includes(search.toLowerCase()),
   );
 
   const ativos = usuarios.filter((u) => u.status === "Ativo").length;
   const inativos = usuarios.filter((u) => u.status === "Inativo").length;
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Carregando usuários...</p>;
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -30,7 +43,7 @@ export default function Usuarios() {
         <Input placeholder="Buscar por nome, email ou papel..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 touch-target" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Users className="h-5 w-5 text-primary" />
@@ -54,25 +67,25 @@ export default function Usuarios() {
       <div className="space-y-3">
         {filtered.map((u) => (
           <Card key={u.id}>
-            <CardContent className="flex items-center gap-4 p-4">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                  {getIniciais(u.nome)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{u.nome}</p>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-              </div>
-              <Badge variant="secondary" className="shrink-0">{u.papel}</Badge>
-              <div className="flex items-center gap-2 shrink-0">
-                <Switch checked={u.status === "Ativo"} />
-                <span className="text-xs text-muted-foreground hidden sm:inline">{u.status}</span>
-              </div>
-              <Button variant="ghost" size="sm" className="touch-target shrink-0">Editar</Button>
-            </CardContent>
-          </Card>
-        ))}
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                    {getIniciais(u.nome)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{u.nome}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">{u.papel}</Badge>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Switch checked={u.status === "Ativo"} onCheckedChange={() => toggleMutation.mutate(u.id)} />
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{u.status}</span>
+                </div>
+                <Button variant="ghost" size="sm" className="touch-target shrink-0">Editar</Button>
+              </CardContent>
+            </Card>
+          ))}
       </div>
     </div>
   );

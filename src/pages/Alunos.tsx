@@ -1,22 +1,39 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { alunos, turmas, getIniciais, getTurmaNome } from "@/data/mock";
 import { Search, Users, GraduationCap } from "lucide-react";
+import { fetchAlunos, fetchTurmas } from "@/lib/portalApi";
+import { getIniciais } from "@/lib/formatters";
 
 export default function Alunos() {
   const [search, setSearch] = useState("");
-  const [selectedAluno, setSelectedAluno] = useState<typeof alunos[0] | null>(null);
+  const [selectedAlunoId, setSelectedAlunoId] = useState<string | null>(null);
+
+  const { data: turmas = [] } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { data: alunos = [], isLoading } = useQuery({ queryKey: ["alunos"], queryFn: () => fetchAlunos() });
+
+  const turmaNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    turmas.forEach((t) => map.set(t.id, t.nome));
+    return map;
+  }, [turmas]);
 
   const filtered = alunos.filter(
     (a) =>
       a.nome.toLowerCase().includes(search.toLowerCase()) ||
-      getTurmaNome(a.turmaId).toLowerCase().includes(search.toLowerCase())
+      (turmaNameById.get(a.turmaId) ?? "").toLowerCase().includes(search.toLowerCase()),
   );
+
+  const selectedAluno = filtered.find((a) => a.id === selectedAlunoId) ?? alunos.find((a) => a.id === selectedAlunoId) ?? null;
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Carregando alunos...</p>;
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -32,7 +49,7 @@ export default function Alunos() {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Users className="h-5 w-5 text-primary" />
@@ -53,12 +70,12 @@ export default function Alunos() {
         </Card>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((a) => (
           <Card
             key={a.id}
             className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-            onClick={() => setSelectedAluno(a)}
+            onClick={() => setSelectedAlunoId(a.id)}
           >
             <CardContent className="flex items-center gap-3 p-4">
               <Avatar className="h-10 w-10">
@@ -68,26 +85,26 @@ export default function Alunos() {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <p className="font-medium truncate">{a.nome}</p>
-                <Badge variant="secondary" className="text-xs mt-1">{getTurmaNome(a.turmaId)}</Badge>
+                <Badge variant="secondary" className="text-xs mt-1">{turmaNameById.get(a.turmaId) ?? "—"}</Badge>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Sheet open={!!selectedAluno} onOpenChange={() => setSelectedAluno(null)}>
+      <Sheet open={Boolean(selectedAluno)} onOpenChange={() => setSelectedAlunoId(null)}>
         {selectedAluno && (
-          <SheetContent className="overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto">
             <SheetHeader>
               <SheetTitle>{selectedAluno.nome}</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><span className="text-muted-foreground">Sexo</span><p>{selectedAluno.sexo === "M" ? "Masculino" : "Feminino"}</p></div>
                 <div><span className="text-muted-foreground">Nascimento</span><p>{new Date(selectedAluno.dataNascimento + "T12:00:00").toLocaleDateString("pt-BR")}</p></div>
                 <div><span className="text-muted-foreground">Email</span><p>{selectedAluno.email || "—"}</p></div>
-                <div><span className="text-muted-foreground">Telefone</span><p>{selectedAluno.telefone}</p></div>
-                <div><span className="text-muted-foreground">Turma</span><p>{getTurmaNome(selectedAluno.turmaId)}</p></div>
+                <div><span className="text-muted-foreground">Telefone</span><p>{selectedAluno.telefone || "—"}</p></div>
+                <div><span className="text-muted-foreground">Turma</span><p>{turmaNameById.get(selectedAluno.turmaId) ?? "—"}</p></div>
               </div>
 
               <div>
@@ -109,7 +126,7 @@ export default function Alunos() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                 <Button className="flex-1 touch-target">Editar</Button>
                 <Button variant="destructive" className="touch-target">Excluir</Button>
               </div>
