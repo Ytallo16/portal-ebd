@@ -3,8 +3,20 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import { AppLayout } from "@/components/layout/AppLayout";
+import Dashboard from "@/pages/Dashboard";
+import Licoes from "@/pages/Licoes";
+import LicaoDetalhe from "@/pages/LicaoDetalhe";
+import ClasseDetalhe from "@/pages/ClasseDetalhe";
+import Turmas from "@/pages/Turmas";
+import TurmaLicoes from "@/pages/TurmaLicoes";
+import Alunos from "@/pages/Alunos";
+import Financeiro from "@/pages/Financeiro";
+import Revistas from "@/pages/Revistas";
+import Configuracoes from "@/pages/Configuracoes";
+import Usuarios from "@/pages/Usuarios";
+import MeuPerfil from "@/pages/MeuPerfil";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -15,8 +27,20 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/licoes" element={<Licoes />} />
+            <Route path="/licoes/:id" element={<LicaoDetalhe />} />
+            <Route path="/licoes/:id/classe/:classId" element={<ClasseDetalhe />} />
+            <Route path="/turmas" element={<Turmas />} />
+            <Route path="/turmas/:id" element={<TurmaLicoes />} />
+            <Route path="/alunos" element={<Alunos />} />
+            <Route path="/financeiro" element={<Financeiro />} />
+            <Route path="/revistas" element={<Revistas />} />
+            <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/configuracoes/usuarios" element={<Usuarios />} />
+            <Route path="/meu-perfil" element={<MeuPerfil />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
