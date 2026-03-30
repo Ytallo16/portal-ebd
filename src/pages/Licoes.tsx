@@ -22,8 +22,7 @@ export default function Licoes() {
   if (!selected) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Lições</h1>
+        <div className="flex items-center justify-end">
           <Button className="touch-target"><Plus className="h-4 w-4 mr-2" /> Nova Lição</Button>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -55,9 +54,9 @@ export default function Licoes() {
         <Button variant="ghost" size="icon" className="touch-target" onClick={() => setSelected(null)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">
+        <p className="text-sm font-medium text-muted-foreground">
           {selected.trimestre}º Trimestre {selected.ano}
-        </h1>
+        </p>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {licoesFiltradas.map((l) => (

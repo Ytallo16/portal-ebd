@@ -1,4 +1,4 @@
-import { Moon, Sun, Bell, Menu } from "lucide-react";
+import { Moon, Sun, Bell, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -8,20 +8,47 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/components/ui/sidebar";
-import { useNavigate } from "react-router-dom";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import { usuarioLogado } from "@/data/mock";
 import { useTheme } from "@/hooks/useTheme";
+
+function getPageTitle(pathname: string) {
+  if (matchPath("/", pathname)) return "Dashboard";
+  if (matchPath("/licoes", pathname)) return "Lições";
+  if (matchPath("/licoes/:id", pathname)) return "Detalhes da Lição";
+  if (matchPath("/licoes/:id/classe/:classId", pathname)) return "Detalhes da Classe";
+  if (matchPath("/turmas", pathname)) return "Turmas";
+  if (matchPath("/turmas/:id", pathname)) return "Lições da Turma";
+  if (matchPath("/alunos", pathname)) return "Alunos";
+  if (matchPath("/financeiro", pathname)) return "Financeiro";
+  if (matchPath("/revistas", pathname)) return "Revistas";
+  if (matchPath("/configuracoes/usuarios", pathname)) return "Usuários";
+  if (matchPath("/configuracoes/perfis-permissoes", pathname)) return "Perfis e permissões";
+  if (matchPath("/configuracoes/organizacoes", pathname)) return "Organizações";
+  if (matchPath("/configuracoes", pathname)) return "Configurações";
+  if (matchPath("/meu-perfil", pathname)) return "Meu Perfil";
+  return "Portal EBD";
+}
 
 export function AppHeader() {
   const { toggleSidebar } = useSidebar();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const pageTitle = getPageTitle(location.pathname);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-card px-4">
-      <Button variant="ghost" size="icon" className="touch-target lg:hidden" onClick={toggleSidebar}>
-        <Menu className="h-5 w-5" />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="touch-target"
+        onClick={toggleSidebar}
+      >
+        <PanelLeft className="h-4 w-4" />
       </Button>
+
+      <h1 className="text-base font-semibold">{pageTitle}</h1>
 
       <div className="flex-1" />
 

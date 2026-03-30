@@ -39,6 +39,8 @@ const App = () => (
             <Route path="/revistas" element={<Revistas />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/configuracoes/usuarios" element={<Usuarios />} />
+            <Route path="/configuracoes/perfis-permissoes" element={<Configuracoes />} />
+            <Route path="/configuracoes/organizacoes" element={<Configuracoes />} />
             <Route path="/meu-perfil" element={<MeuPerfil />} />
           </Route>
           <Route path="*" element={<NotFound />} />

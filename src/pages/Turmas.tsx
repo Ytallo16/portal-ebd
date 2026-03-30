@@ -14,8 +14,7 @@ export default function Turmas() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Turmas</h1>
+      <div className="flex items-center justify-end">
         <Button className="touch-target"><Plus className="h-4 w-4 mr-2" /> Nova Turma</Button>
       </div>
 

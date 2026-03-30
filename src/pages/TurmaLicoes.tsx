@@ -29,7 +29,7 @@ export default function TurmaLicoes() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">{turma.nome}</h1>
+          <p className="text-sm font-medium">{turma.nome}</p>
           <p className="text-sm text-muted-foreground">
             {turma.faixaEtaria} · {turma.professores.join(", ")} · {turma.totalAlunos} alunos
           </p>
