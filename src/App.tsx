@@ -15,6 +15,8 @@ import Financeiro from "@/pages/Financeiro";
 import Revistas from "@/pages/Revistas";
 import Configuracoes from "@/pages/Configuracoes";
 import Usuarios from "@/pages/Usuarios";
+import PerfisPermissoes from "@/pages/PerfisPermissoes";
+import Organizacoes from "@/pages/Organizacoes";
 import MeuPerfil from "@/pages/MeuPerfil";
 import NotFound from "@/pages/NotFound";
 
@@ -39,8 +41,8 @@ const App = () => (
             <Route path="/revistas" element={<Revistas />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/configuracoes/usuarios" element={<Usuarios />} />
-            <Route path="/configuracoes/perfis-permissoes" element={<Configuracoes />} />
-            <Route path="/configuracoes/organizacoes" element={<Configuracoes />} />
+            <Route path="/configuracoes/perfis-permissoes" element={<PerfisPermissoes />} />
+            <Route path="/configuracoes/organizacoes" element={<Organizacoes />} />
             <Route path="/meu-perfil" element={<MeuPerfil />} />
           </Route>
           <Route path="*" element={<NotFound />} />
