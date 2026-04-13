@@ -3,22 +3,84 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { Search, Users, UserCheck, UserX } from "lucide-react";
-import { fetchUsuarios, toggleUserActive } from "@/lib/portalApi";
+import { KeyRound, Pencil, Search, Users, UserCheck, UserX } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { fetchUsuarioLogado, fetchUsuarios, resetUserPassword, toggleUserActive, updateUsuario, type Usuario } from "@/lib/portalApi";
 import { getIniciais } from "@/lib/formatters";
 
 export default function Usuarios() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [resettingUser, setResettingUser] = useState<Usuario | null>(null);
+  const [editForm, setEditForm] = useState({ nome: "", email: "", isActive: true });
 
   const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
+  const { data: usuarioLogado } = useQuery({ queryKey: ["me"], queryFn: fetchUsuarioLogado });
+  const isAdminGeral = Boolean(usuarioLogado?.isAdminGeral);
   const toggleMutation = useMutation({
     mutationFn: (userId: string) => toggleUserActive(userId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["usuarios"] }),
   });
+  const resetPasswordMutation = useMutation({
+    mutationFn: (userId: string) => resetUserPassword(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      setIsResetConfirmOpen(false);
+      setResettingUser(null);
+    },
+  });
+  const editMutation = useMutation({
+    mutationFn: () => {
+      if (!editingUserId) throw new Error("Usuário inválido");
+      return updateUsuario(editingUserId, {
+        nome: editForm.nome,
+        email: editForm.email,
+        is_active: editForm.isActive,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      setIsEditOpen(false);
+      setEditingUserId(null);
+    },
+  });
+
+  function openEditModal(usuario: Usuario) {
+    setEditingUserId(usuario.id);
+    setEditForm({
+      nome: usuario.nome,
+      email: usuario.email,
+      isActive: usuario.status === "Ativo",
+    });
+    setIsEditOpen(true);
+  }
+
+  async function onSubmitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    await editMutation.mutateAsync();
+  }
+
+  async function confirmResetPassword() {
+    if (!resettingUser) return;
+    await resetPasswordMutation.mutateAsync(resettingUser.id);
+  }
 
   const filtered = usuarios.filter(
     (u) =>
@@ -82,11 +144,107 @@ export default function Usuarios() {
                   <Switch checked={u.status === "Ativo"} onCheckedChange={() => toggleMutation.mutate(u.id)} />
                   <span className="text-xs text-muted-foreground hidden sm:inline">{u.status}</span>
                 </div>
-                <Button variant="ghost" size="sm" className="touch-target shrink-0">Editar</Button>
+                {isAdminGeral ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="touch-target shrink-0"
+                    onClick={() => {
+                      setResettingUser(u);
+                      setIsResetConfirmOpen(true);
+                    }}
+                    title="Resetar senha para 123456"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    <span className="sr-only">Resetar senha para 123456</span>
+                  </Button>
+                ) : null}
+                <Button variant="ghost" size="icon" className="touch-target shrink-0" onClick={() => openEditModal(u)}>
+                  <Pencil className="h-4 w-4" />
+                  <span className="sr-only">Editar usuário</span>
+                </Button>
               </CardContent>
             </Card>
           ))}
       </div>
+
+      <Dialog
+        open={isEditOpen}
+        onOpenChange={(open) => {
+          setIsEditOpen(open);
+          if (!open) {
+            setEditingUserId(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar usuário</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={onSubmitEdit}>
+            <div>
+              <Label>Nome</Label>
+              <Input
+                value={editForm.nome}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, nome: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <Label htmlFor="usuario-ativo" className="m-0">
+                Usuário ativo
+              </Label>
+              <Switch
+                id="usuario-ativo"
+                checked={editForm.isActive}
+                onCheckedChange={(checked) => setEditForm((prev) => ({ ...prev, isActive: checked }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={editMutation.isPending || !editingUserId}>
+                {editMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={isResetConfirmOpen}
+        onOpenChange={(open) => {
+          setIsResetConfirmOpen(open);
+          if (!open) {
+            setResettingUser(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resetar senha</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confirma resetar a senha de {resettingUser?.nome ?? "este usuário"} para 123456?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetPasswordMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmResetPassword} disabled={resetPasswordMutation.isPending}>
+              {resetPasswordMutation.isPending ? "Resetando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

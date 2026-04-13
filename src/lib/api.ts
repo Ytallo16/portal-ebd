@@ -32,6 +32,7 @@ export function clearSession() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(ORG_KEY);
+  window.dispatchEvent(new Event("portal-ebd:session-cleared"));
 }
 
 export function isAuthenticated() {

@@ -3,14 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/auth/AuthProvider";
 import { fetchUsuarioLogado } from "@/lib/portalApi";
+import { UnauthorizedError } from "@/lib/api";
 
 export function ProtectedRoute() {
   const { authenticated } = useAuth();
   const location = useLocation();
-  const { data: usuarioLogado, isLoading } = useQuery({
+  const { data: usuarioLogado, isLoading, isError, error } = useQuery({
     queryKey: ["me"],
     queryFn: fetchUsuarioLogado,
     enabled: authenticated,
+    retry: false,
   });
 
   if (!authenticated) {
@@ -19,6 +21,10 @@ export function ProtectedRoute() {
 
   if (isLoading) {
     return <p className="p-4 text-sm text-muted-foreground">Carregando permissões...</p>;
+  }
+
+  if (isError && error instanceof UnauthorizedError) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   const isAdminGeral = Boolean(usuarioLogado?.isAdminGeral);

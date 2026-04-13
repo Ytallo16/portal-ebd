@@ -9,6 +9,7 @@ import { ProtectedRoute, PublicOnlyRoute } from "@/auth/RouteGuards";
 
 import Dashboard from "@/pages/Dashboard";
 import Licoes from "@/pages/Licoes";
+import Trimestres from "@/pages/Trimestres";
 import LicaoDetalhe from "@/pages/LicaoDetalhe";
 import ClasseDetalhe from "@/pages/ClasseDetalhe";
 import Turmas from "@/pages/Turmas";
@@ -34,7 +35,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route element={<PublicOnlyRoute />}>
               <Route path="/login" element={<Login />} />
@@ -44,6 +45,7 @@ const App = () => (
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/licoes" element={<Licoes />} />
+                <Route path="/trimestres" element={<Trimestres />} />
                 <Route path="/licoes/:id" element={<LicaoDetalhe />} />
                 <Route path="/licoes/:id/classe/:classId" element={<ClasseDetalhe />} />
                 <Route path="/turmas" element={<Turmas />} />
@@ -55,6 +57,7 @@ const App = () => (
                 <Route path="/configuracoes" element={<Configuracoes />} />
                 <Route path="/configuracoes/usuarios" element={<Usuarios />} />
                 <Route path="/configuracoes/perfis-permissoes" element={<PerfisPermissoes />} />
+                <Route path="/configuracoes/trimestres" element={<Trimestres />} />
                 <Route path="/configuracoes/organizacoes" element={<Organizacoes />} />
                 <Route path="/configuracoes/organizacoes/:id" element={<OrganizacaoDetalhe />} />
                 <Route path="/meu-perfil" element={<MeuPerfil />} />

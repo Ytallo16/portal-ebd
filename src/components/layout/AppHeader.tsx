@@ -25,6 +25,7 @@ import { useAuth } from "@/auth/AuthProvider";
 function getPageTitle(pathname: string) {
   if (matchPath("/", pathname)) return "Dashboard";
   if (matchPath("/licoes", pathname)) return "Lições";
+  if (matchPath("/trimestres", pathname)) return "Trimestres";
   if (matchPath("/licoes/:id", pathname)) return "Detalhes da Lição";
   if (matchPath("/licoes/:id/classe/:classId", pathname)) return "Detalhes da Classe";
   if (matchPath("/turmas", pathname)) return "Turmas";
@@ -35,6 +36,7 @@ function getPageTitle(pathname: string) {
   if (matchPath("/revistas", pathname)) return "Revistas";
   if (matchPath("/configuracoes/usuarios", pathname)) return "Usuários";
   if (matchPath("/configuracoes/perfis-permissoes", pathname)) return "Perfis e permissões";
+  if (matchPath("/configuracoes/trimestres", pathname)) return "Trimestres";
   if (matchPath("/configuracoes/organizacoes/:id", pathname)) return "Detalhes da Organização";
   if (matchPath("/configuracoes/organizacoes", pathname)) return "Organizações";
   if (matchPath("/configuracoes", pathname)) return "Configurações";
@@ -45,6 +47,7 @@ function getPageTitle(pathname: string) {
 function getBreadcrumbs(pathname: string) {
   if (matchPath("/", pathname)) return [{ label: "Dashboard" }];
   if (matchPath("/licoes", pathname)) return [{ label: "Lições" }];
+  if (matchPath("/trimestres", pathname)) return [{ label: "Trimestres" }];
   if (matchPath("/licoes/:id", pathname)) {
     return [{ label: "Lições", to: "/licoes" }, { label: "Detalhes da Lição" }];
   }
@@ -67,6 +70,9 @@ function getBreadcrumbs(pathname: string) {
   }
   if (matchPath("/configuracoes/perfis-permissoes", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Perfis e permissões" }];
+  }
+  if (matchPath("/configuracoes/trimestres", pathname)) {
+    return [{ label: "Configurações", to: "/configuracoes" }, { label: "Trimestres" }];
   }
   if (matchPath("/configuracoes/organizacoes", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Organizações" }];

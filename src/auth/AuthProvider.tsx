@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { isAuthenticated, loginWithCredentials, logoutFromApi } from "@/lib/api";
 
 type AuthContextValue = {
@@ -11,6 +11,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState<boolean>(() => isAuthenticated());
+
+  useEffect(() => {
+    const syncAuthState = () => setAuthenticated(isAuthenticated());
+    window.addEventListener("portal-ebd:session-cleared", syncAuthState);
+    return () => {
+      window.removeEventListener("portal-ebd:session-cleared", syncAuthState);
+    };
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({

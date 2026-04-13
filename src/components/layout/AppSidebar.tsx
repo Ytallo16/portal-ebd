@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   BookOpen,
+  CalendarRange,
   Users,
   GraduationCap,
   DollarSign,
@@ -36,6 +37,7 @@ import { useAuth } from "@/auth/AuthProvider";
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Lições", url: "/licoes", icon: BookOpen },
+  { title: "Trimestres", url: "/trimestres", icon: CalendarRange },
   { title: "Turmas", url: "/turmas", icon: GraduationCap },
   { title: "Alunos", url: "/alunos", icon: Users },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
@@ -45,6 +47,7 @@ const items = [
 const configuracaoItems = [
   { title: "Usuários", url: "/configuracoes/usuarios" },
   { title: "Perfis e permissões", url: "/configuracoes/perfis-permissoes" },
+  { title: "Trimestres", url: "/configuracoes/trimestres" },
   { title: "Organizações", url: "/configuracoes/organizacoes" },
 ];
 
