@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { isAuthenticated, loginWithCredentials, logoutFromApi } from "@/lib/api";
+import { hydrateOrganizationContext, isAuthenticated, loginWithCredentials, logoutFromApi } from "@/lib/api";
 
 type AuthContextValue = {
   authenticated: boolean;
@@ -19,6 +19,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("portal-ebd:session-cleared", syncAuthState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    void hydrateOrganizationContext();
+  }, [authenticated]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

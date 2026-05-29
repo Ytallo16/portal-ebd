@@ -6,15 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { fetchAlunos, fetchTurmas } from "@/lib/portalApi";
 import { formatDate } from "@/lib/formatters";
 
 export default function TurmaDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { activeOrgId, podeCarregarOperacional } = usePermissions();
 
-  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
-  const { data: alunos = [], isLoading: loadingAlunos } = useQuery({ queryKey: ["alunos"], queryFn: () => fetchAlunos() });
+  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "turmas"),
+    queryFn: fetchTurmas,
+    enabled: podeCarregarOperacional,
+  });
+  const { data: alunos = [], isLoading: loadingAlunos } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "alunos"),
+    queryFn: () => fetchAlunos(),
+    enabled: podeCarregarOperacional,
+  });
 
   const turma = turmas.find((t) => t.id === id);
   const alunosDaTurma = useMemo(

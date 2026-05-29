@@ -5,21 +5,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight } from "lucide-react";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { fetchTurmas, fetchLicoesByTurma } from "@/lib/portalApi";
 import { formatDate } from "@/lib/formatters";
 
 export default function TurmaLicoes() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { activeOrgId, podeCarregarOperacional } = usePermissions();
   const [selectedTri, setSelectedTri] = useState<{ t: number; a: number } | null>(null);
 
-  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "turmas"),
+    queryFn: fetchTurmas,
+    enabled: podeCarregarOperacional,
+  });
   const turma = turmas.find((t) => t.id === id);
 
   const { data: licoes = [], isLoading: loadingLicoes } = useQuery({
-    queryKey: ["licoes-turma", id, selectedTri?.t, selectedTri?.a],
+    queryKey: orgQueryKey(activeOrgId, "licoes-turma", id, selectedTri?.t, selectedTri?.a),
     queryFn: () => fetchLicoesByTurma(id ?? "", selectedTri?.t, selectedTri?.a),
-    enabled: Boolean(id),
+    enabled: podeCarregarOperacional && Boolean(id),
   });
 
   const trimestresDisponiveis = useMemo(() => {
@@ -83,7 +89,9 @@ export default function TurmaLicoes() {
             <Card
               key={l.id}
               className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-              onClick={() => navigate(`/licoes/${l.id}/classe/${turma.id}`)}
+              onClick={() =>
+                navigate(`/licoes/${l.ano}/${l.trimestre}/${l.numero}/turmas/${turma.id}`)
+              }
             >
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">

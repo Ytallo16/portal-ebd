@@ -52,8 +52,8 @@ const escopos: Escopo[] = [
 const perfisIniciais: PerfilPermissao[] = [
   {
     id: "p1",
-    nome: "Administrador",
-    descricao: "Acesso completo ao sistema",
+    nome: "Administrador do sistema",
+    descricao: "Acesso completo em qualquer contexto organizacional",
     permissoes: [
       { modulo: "Dashboard", descricao: "Indicadores e painéis", acoes: { visualizar: true } },
       { modulo: "Lições", descricao: "Cadastro e acompanhamento", acoes: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true } },
@@ -66,7 +66,7 @@ const perfisIniciais: PerfilPermissao[] = [
   {
     id: "p2",
     nome: "Secretário de Igreja",
-    descricao: "Gestão operacional da igreja local",
+    descricao: "Gestão completa da igreja local (contexto fixo)",
     permissoes: [
       { modulo: "Dashboard", descricao: "Indicadores e painéis", acoes: { visualizar: true } },
       { modulo: "Lições", descricao: "Cadastro e acompanhamento", acoes: { visualizar: true, criar: true, editar: true, aprovar: true } },
@@ -79,7 +79,7 @@ const perfisIniciais: PerfilPermissao[] = [
   {
     id: "p3",
     nome: "Secretário de Campo",
-    descricao: "Acompanha múltiplas organizações",
+    descricao: "Gestão completa do campo; seleciona igreja para operação local",
     permissoes: [
       { modulo: "Dashboard", descricao: "Indicadores e painéis", acoes: { visualizar: true } },
       { modulo: "Lições", descricao: "Cadastro e acompanhamento", acoes: { visualizar: true, aprovar: true } },
@@ -92,7 +92,7 @@ const perfisIniciais: PerfilPermissao[] = [
   {
     id: "p4",
     nome: "Professor",
-    descricao: "Registro de frequência e acompanhamento da turma",
+    descricao: "Frequência, ofertas e acompanhamento apenas da turma vinculada",
     permissoes: [
       { modulo: "Dashboard", descricao: "Indicadores e painéis", acoes: { visualizar: true } },
       { modulo: "Lições", descricao: "Cadastro e acompanhamento", acoes: { visualizar: true, editar: true } },

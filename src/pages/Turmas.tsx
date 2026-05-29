@@ -8,12 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { createTurma, fetchTurmas } from "@/lib/portalApi";
 
 export default function Turmas() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { data: turmas = [], isLoading } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { activeOrgId, podeCarregarOperacional } = usePermissions();
+  const { data: turmas = [], isLoading } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "turmas"),
+    queryFn: fetchTurmas,
+    enabled: podeCarregarOperacional,
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [form, setForm] = useState({ nome: "", faixaEtaria: "", cor: "#3B82F6" });
   const createMutation = useMutation({

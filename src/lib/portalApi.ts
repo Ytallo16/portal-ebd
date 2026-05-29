@@ -1,12 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { getResults, request } from "@/lib/api";
+import { ApiError, getResults, request } from "@/lib/api";
 import { formatDate } from "@/lib/formatters";
+
+export type TurmaProfessor = {
+  id: number;
+  nome: string;
+};
 
 export type Turma = {
   id: string;
   nome: string;
   faixaEtaria: string;
   professores: string[];
+  professorUsers: TurmaProfessor[];
   totalAlunos: number;
   cor: string;
 };
@@ -85,6 +91,33 @@ export type Usuario = {
   status: "Ativo" | "Inativo";
 };
 
+export type ModuloPermissao =
+  | "usuarios"
+  | "organizacoes"
+  | "turmas"
+  | "alunos"
+  | "licoes"
+  | "frequencia"
+  | "financeiro"
+  | "revistas"
+  | "dashboard";
+
+export type PermissaoDetalhe = {
+  visualizar: boolean;
+  criar: boolean;
+  editar: boolean;
+  excluir: boolean;
+  aprovar: boolean;
+};
+
+export type OrganizacaoContexto = {
+  id: number;
+  nome: string;
+  tipo: string;
+  parentId: number | null;
+  parentNome: string | null;
+};
+
 export type UsuarioLogado = {
   nome: string;
   email: string;
@@ -93,6 +126,19 @@ export type UsuarioLogado = {
   status: "Ativo" | "Inativo";
   iniciais: string;
   isAdminGeral: boolean;
+  isAdminSistema: boolean;
+  requerSelecaoContexto: boolean;
+  organizacaoAtiva: OrganizacaoContexto | null;
+  organizacoesDisponiveis: OrganizacaoContexto[];
+  permissoes: Partial<Record<ModuloPermissao, PermissaoDetalhe>>;
+  turmasProfessor: Array<{ id: number; nome: string }>;
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMINISTRADOR: "Administrador do sistema",
+  SECRETARIO_CAMPO: "Secretário de Campo",
+  SECRETARIO_IGREJA: "Secretário de Igreja",
+  PROFESSOR: "Professor",
 };
 
 export type AttendanceSheet = {
@@ -120,6 +166,10 @@ export async function fetchTurmas(): Promise<Turma[]> {
     nome: item.nome,
     faixaEtaria: item.faixa_etaria,
     professores: (item.professores ?? []).map((p: any) => p.user_nome),
+    professorUsers: (item.professores ?? []).map((p: any) => ({
+      id: Number(p.user),
+      nome: p.user_nome,
+    })),
     totalAlunos: item.total_alunos ?? 0,
     cor: item.cor ?? "#3B82F6",
   }));
@@ -137,12 +187,8 @@ export async function createTurma(payload: { nome: string; faixaEtaria: string; 
   });
 }
 
-export async function fetchAlunos(search = ""): Promise<Aluno[]> {
-  const query = search ? `?search=${encodeURIComponent(search)}` : "";
-  const data = await request<unknown>(`/students/${query}`);
-  const items = getResults<any>(data);
-
-  return items.map((item) => ({
+function mapAluno(item: any): Aluno {
+  return {
     id: String(item.id),
     nome: item.nome,
     sexo: item.sexo,
@@ -159,8 +205,18 @@ export async function fetchAlunos(search = ""): Promise<Aluno[]> {
       cidade: item.endereco?.cidade ?? "",
       uf: item.endereco?.uf ?? "",
     },
-    responsaveis: (item.responsaveis ?? []).map((r: any) => ({ nome: r.nome, telefone: r.telefone ?? "" })),
-  }));
+    responsaveis: (item.responsaveis ?? []).map((r: any) => ({
+      nome: r.nome,
+      telefone: r.telefone ?? "",
+    })),
+  };
+}
+
+export async function fetchAlunos(search = ""): Promise<Aluno[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  const data = await request<unknown>(`/students/${query}`);
+  const items = getResults<any>(data);
+  return items.map(mapAluno);
 }
 
 export async function createAluno(payload: {
@@ -183,6 +239,48 @@ export async function createAluno(payload: {
       ativo: true,
     }),
   });
+}
+
+export async function updateAluno(
+  id: string,
+  payload: Partial<{
+    nome: string;
+    sexo: "M" | "F";
+    dataNascimento: string;
+    email: string;
+    telefone: string;
+    turmaId: string;
+    endereco: Aluno["endereco"];
+  }>,
+): Promise<Aluno> {
+  const body: Record<string, unknown> = {};
+  if (payload.nome !== undefined) body.nome = payload.nome;
+  if (payload.sexo !== undefined) body.sexo = payload.sexo;
+  if (payload.dataNascimento !== undefined) body.data_nascimento = payload.dataNascimento;
+  if (payload.email !== undefined) body.email = payload.email;
+  if (payload.telefone !== undefined) body.telefone = payload.telefone;
+  if (payload.turmaId !== undefined) body.class_group = Number(payload.turmaId);
+  if (payload.endereco !== undefined) {
+    body.endereco = {
+      cep: payload.endereco.cep,
+      rua: payload.endereco.rua,
+      numero: payload.endereco.numero,
+      complemento: payload.endereco.complemento,
+      bairro: payload.endereco.bairro,
+      cidade: payload.endereco.cidade,
+      uf: payload.endereco.uf,
+    };
+  }
+
+  const data = await request<any>(`/students/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return mapAluno(data);
+}
+
+export async function deleteAluno(id: string) {
+  await request(`/students/${id}/`, { method: "DELETE" });
 }
 
 export async function fetchLicoes(filters?: { trimestre?: number; ano?: number }): Promise<Licao[]> {
@@ -349,34 +447,169 @@ export async function fetchLicoesByTurma(turmaId: string, trimestre?: number, an
   }));
 }
 
-export async function fetchAttendanceByLessonClass(lessonId: string, classId: string) {
-  try {
-    return await request<any>(`/lessons/${lessonId}/classes/${classId}/attendance`);
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchAttendanceSheets(): Promise<AttendanceSheet[]> {
-  const data = await request<unknown>("/attendance-sheets/");
-  const items = getResults<any>(data);
-  return items.map((item) => ({
+function mapAttendanceSheet(item: any): AttendanceSheet {
+  return {
     id: String(item.id),
     lesson: String(item.lesson),
     classGroup: String(item.class_group),
-    professor: item.professor,
+    professor: item.professor ?? null,
     visitantes: item.visitantes ?? 0,
     biblias: item.biblias ?? 0,
     revistas: item.revistas ?? 0,
     ofertaValor: Number(item.oferta_valor ?? 0),
-    finalizedAt: item.finalized_at,
+    finalizedAt: item.finalized_at ?? null,
     records: (item.records ?? []).map((r: any) => ({
       id: String(r.id),
       student: String(r.student),
       alunoNome: r.aluno_nome,
       presente: Boolean(r.presente),
     })),
-  }));
+  };
+}
+
+export async function fetchAttendanceByLessonClass(
+  lessonId: string,
+  classId: string,
+): Promise<AttendanceSheet | null> {
+  try {
+    const data = await request<any>(`/lessons/${lessonId}/classes/${classId}/attendance`);
+    return mapAttendanceSheet(data);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function fetchAttendanceSheets(): Promise<AttendanceSheet[]> {
+  const data = await request<unknown>("/attendance-sheets/");
+  const items = getResults<any>(data);
+  return items.map(mapAttendanceSheet);
+}
+
+export async function createAttendanceSheet(payload: {
+  lesson: string;
+  classGroup: string;
+  professor?: number | null;
+  visitantes?: number;
+  biblias?: number;
+  revistas?: number;
+  ofertaValor?: number;
+}) {
+  const data = await request<any>("/attendance-sheets/", {
+    method: "POST",
+    body: JSON.stringify({
+      lesson: Number(payload.lesson),
+      class_group: Number(payload.classGroup),
+      professor: payload.professor ?? null,
+      visitantes: payload.visitantes ?? 0,
+      biblias: payload.biblias ?? 0,
+      revistas: payload.revistas ?? 0,
+      oferta_valor: String(payload.ofertaValor ?? 0),
+    }),
+  });
+  return mapAttendanceSheet(data);
+}
+
+export async function updateAttendanceSheet(
+  sheetId: string,
+  payload: Partial<{
+    professor: number | null;
+    visitantes: number;
+    biblias: number;
+    revistas: number;
+    ofertaValor: number;
+  }>,
+) {
+  const body: Record<string, unknown> = {};
+  if (payload.professor !== undefined) body.professor = payload.professor;
+  if (payload.visitantes !== undefined) body.visitantes = payload.visitantes;
+  if (payload.biblias !== undefined) body.biblias = payload.biblias;
+  if (payload.revistas !== undefined) body.revistas = payload.revistas;
+  if (payload.ofertaValor !== undefined) body.oferta_valor = String(payload.ofertaValor);
+
+  const data = await request<any>(`/attendance-sheets/${sheetId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return mapAttendanceSheet(data);
+}
+
+export async function saveAttendanceRecords(
+  sheetId: string,
+  records: Array<{ student: string; presente: boolean }>,
+) {
+  const data = await request<any>(`/attendance-sheets/${sheetId}/records/`, {
+    method: "POST",
+    body: JSON.stringify({
+      records: records.map((r) => ({
+        student: Number(r.student),
+        presente: r.presente,
+      })),
+    }),
+  });
+  return mapAttendanceSheet(data);
+}
+
+export async function ensureAttendanceSheet(
+  lessonId: string,
+  classGroupId: string,
+  professorId?: number | null,
+) {
+  const existing = await fetchAttendanceByLessonClass(lessonId, classGroupId);
+  if (existing) return existing;
+  return createAttendanceSheet({
+    lesson: lessonId,
+    classGroup: classGroupId,
+    professor: professorId ?? null,
+  });
+}
+
+export type FinalizeLessonError = {
+  message: string;
+  turmasPendentes?: string[];
+};
+
+export async function finalizeLesson(lessonId: string): Promise<Licao> {
+  try {
+    const item = await request<any>(`/lessons/${lessonId}/finalize/`, { method: "POST" });
+    return {
+      id: String(item.id),
+      numero: item.numero,
+      tema: item.tema,
+      data: item.data,
+      revista: item.revista,
+      textoAureo: item.texto_aureo,
+      textoBiblico: item.texto_biblico,
+      objetivo: item.objetivo,
+      status: mapStatus(item.status),
+      trimestre: item.trimestre,
+      ano: item.ano,
+      presentes: item.presentes ?? 0,
+      ausentes: item.ausentes ?? 0,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      let detail = error.message;
+      let turmasPendentes: string[] | undefined;
+      try {
+        const parsed = JSON.parse(error.message) as {
+          turmas_pendentes?: string[];
+          detail?: string | string[];
+        };
+        turmasPendentes = parsed.turmas_pendentes;
+        if (typeof parsed.detail === "string") detail = parsed.detail;
+        else if (Array.isArray(parsed.detail)) detail = parsed.detail.join(" ");
+      } catch {
+        /* mantém texto bruto */
+      }
+      const err = new Error(detail) as Error & FinalizeLessonError;
+      err.turmasPendentes = turmasPendentes;
+      throw err;
+    }
+    throw error;
+  }
 }
 
 export async function fetchOfferings(classId?: string): Promise<Oferta[]> {
@@ -453,16 +686,34 @@ export async function resetUserPassword(userId: string) {
 }
 
 export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
-  const me = await request<any>("/me");
+  const me = await request<any>("/me", {}, { ensureOrganization: false });
   const papeis = Array.isArray(me.papeis) ? me.papeis : [];
   const papelPrincipal = papeis[0] ?? "Usuário";
   const papeisNormalizados = papeis.map((papel: string) => papel.trim().toUpperCase());
-  const isAdminGeral = papeisNormalizados.includes("ADMINISTRADOR GERAL") || papeisNormalizados.includes("ADMINISTRADOR");
+  const isAdminSistema =
+    Boolean(me.is_admin_sistema) ||
+    papeisNormalizados.includes("ADMINISTRADOR GERAL") ||
+    papeisNormalizados.includes("ADMINISTRADOR");
+
+  const mapOrg = (org: any): OrganizacaoContexto | null => {
+    if (!org) return null;
+    return {
+      id: org.id,
+      nome: org.nome,
+      tipo: org.tipo,
+      parentId: org.parent_id ?? null,
+      parentNome: org.parent_nome ?? null,
+    };
+  };
+
+  const organizacoesDisponiveis = Array.isArray(me.organizacoes_disponiveis)
+    ? me.organizacoes_disponiveis.map(mapOrg).filter(Boolean)
+    : [];
 
   return {
     nome: me.nome,
     email: me.email,
-    papel: papelPrincipal,
+    papel: ROLE_LABELS[papelPrincipal] ?? papelPrincipal,
     papeis,
     status: me.is_active ? "Ativo" : "Inativo",
     iniciais: me.nome
@@ -472,7 +723,13 @@ export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
       .map((n: string) => n[0])
       .join("")
       .toUpperCase(),
-    isAdminGeral,
+    isAdminGeral: isAdminSistema,
+    isAdminSistema,
+    requerSelecaoContexto: Boolean(me.requer_selecao_contexto),
+    organizacaoAtiva: mapOrg(me.organizacao_ativa),
+    organizacoesDisponiveis: organizacoesDisponiveis as OrganizacaoContexto[],
+    permissoes: me.permissoes ?? {},
+    turmasProfessor: Array.isArray(me.turmas) ? me.turmas : [],
   };
 }
 
@@ -496,10 +753,245 @@ export async function fetchDashboardBirthdays() {
   return request<any[]>("/dashboard/birthdays");
 }
 
+export type ProfessorDashboardTurmaResumo = {
+  id: number;
+  nome: string;
+  cor: string;
+};
+
+export type ProfessorDashboardLicaoResumo = {
+  id: number;
+  numero: number;
+  tema: string;
+  data: string;
+  revista?: string;
+  textoAureo?: string;
+  registrada?: boolean;
+};
+
+export type ProfessorDashboard = {
+  turmasDisponiveis: ProfessorDashboardTurmaResumo[];
+  turma: ProfessorDashboardTurmaResumo & { totalAlunos: number };
+  trimestre: { numero: number; ano: number; titulo: string } | null;
+  resumo: {
+    frequenciaMediaPct: number;
+    pendenciasRegistro: number;
+    ultimaEbdPct: number | null;
+    ofertasTrimestre: number;
+    visitantesTrimestre: number;
+  };
+  proximaLicao: ProfessorDashboardLicaoResumo | null;
+  ultimoRegistro: {
+    licaoNumero: number;
+    licaoTema: string;
+    data: string;
+    presentes: number;
+    ausentes: number;
+    visitantes: number;
+    biblias: number;
+    revistas: number;
+    ofertaValor: number;
+  } | null;
+  licoesPendentes: ProfessorDashboardLicaoResumo[];
+  evolucaoFrequencia: Array<{
+    data: string;
+    licaoNumero: number;
+    presentes: number;
+    ausentes: number;
+    pct: number;
+  }>;
+  aniversariantes: Array<{
+    nome: string;
+    data: string;
+    diasParaAniversario: number;
+  }>;
+  rankingAlunos: Array<{
+    id: number;
+    nome: string;
+    presencas: number;
+    ausencias: number;
+  }>;
+};
+
+function mapProfessorDashboard(data: any): ProfessorDashboard {
+  return {
+    turmasDisponiveis: (data.turmas_disponiveis ?? []).map((t: any) => ({
+      id: t.id,
+      nome: t.nome,
+      cor: t.cor,
+    })),
+    turma: {
+      id: data.turma.id,
+      nome: data.turma.nome,
+      cor: data.turma.cor,
+      totalAlunos: data.turma.total_alunos ?? 0,
+    },
+    trimestre: data.trimestre
+      ? {
+          numero: data.trimestre.numero,
+          ano: data.trimestre.ano,
+          titulo: data.trimestre.titulo,
+        }
+      : null,
+    resumo: {
+      frequenciaMediaPct: data.resumo?.frequencia_media_pct ?? 0,
+      pendenciasRegistro: data.resumo?.pendencias_registro ?? 0,
+      ultimaEbdPct: data.resumo?.ultima_ebd_pct ?? null,
+      ofertasTrimestre: Number(data.resumo?.ofertas_trimestre ?? 0),
+      visitantesTrimestre: data.resumo?.visitantes_trimestre ?? 0,
+    },
+    proximaLicao: data.proxima_licao
+      ? {
+          id: data.proxima_licao.id,
+          numero: data.proxima_licao.numero,
+          tema: data.proxima_licao.tema,
+          data: data.proxima_licao.data,
+          revista: data.proxima_licao.revista ?? "",
+          textoAureo: data.proxima_licao.texto_aureo ?? "",
+          registrada: Boolean(data.proxima_licao.registrada),
+        }
+      : null,
+    ultimoRegistro: data.ultimo_registro
+      ? {
+          licaoNumero: data.ultimo_registro.licao_numero,
+          licaoTema: data.ultimo_registro.licao_tema,
+          data: data.ultimo_registro.data,
+          presentes: data.ultimo_registro.presentes,
+          ausentes: data.ultimo_registro.ausentes,
+          visitantes: data.ultimo_registro.visitantes,
+          biblias: data.ultimo_registro.biblias,
+          revistas: data.ultimo_registro.revistas,
+          ofertaValor: Number(data.ultimo_registro.oferta_valor ?? 0),
+        }
+      : null,
+    licoesPendentes: (data.licoes_pendentes ?? []).map((l: any) => ({
+      id: l.id,
+      numero: l.numero,
+      tema: l.tema,
+      data: l.data,
+    })),
+    evolucaoFrequencia: (data.evolucao_frequencia ?? []).map((item: any) => ({
+      data: item.data,
+      licaoNumero: item.licao_numero,
+      presentes: item.presentes,
+      ausentes: item.ausentes,
+      pct: item.pct,
+    })),
+    aniversariantes: (data.aniversariantes ?? []).map((a: any) => ({
+      nome: a.nome,
+      data: a.data,
+      diasParaAniversario: a.dias_para_aniversario,
+    })),
+    rankingAlunos: (data.ranking_alunos ?? []).map((a: any) => ({
+      id: a.id,
+      nome: a.nome,
+      presencas: a.presencas,
+      ausencias: a.ausencias,
+    })),
+  };
+}
+
+export async function fetchProfessorDashboard(classId?: number): Promise<ProfessorDashboard> {
+  const query = classId ? `?class_id=${classId}` : "";
+  const data = await request<any>(`/dashboard/professor${query}`);
+  return mapProfessorDashboard(data);
+}
+
 export function monthLabel(dateStr: string): string {
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" });
 }
 
 export function weekLabel(dateStr: string): string {
   return formatDate(dateStr).slice(0, 5);
+}
+
+export type Igreja = {
+  id: string;
+  nome: string;
+  sigla: string;
+  cidade: string;
+  uf: string;
+  responsavel: string;
+  membros: number;
+  status: "Ativa" | "Inativa";
+  isActive: boolean;
+};
+
+export function isTipoCampo(tipo: string) {
+  const normalized = tipo.trim().toUpperCase();
+  return normalized === "CAMPO" || normalized === "SEDE";
+}
+
+export function isTipoIgreja(tipo: string) {
+  const normalized = tipo.trim().toUpperCase();
+  return normalized === "IGREJA" || normalized === "FILIAL" || normalized === "CONGREGACAO";
+}
+
+function mapIgreja(item: any): Igreja {
+  const ativa = item.is_active !== false && (item.status ?? "ATIVA").toUpperCase() === "ATIVA";
+  return {
+    id: String(item.id),
+    nome: item.nome,
+    sigla: item.sigla,
+    cidade: item.cidade,
+    uf: item.uf,
+    responsavel: item.responsavel ?? "",
+    membros: Number(item.membros ?? 0),
+    status: ativa ? "Ativa" : "Inativa",
+    isActive: ativa,
+  };
+}
+
+export async function fetchIgrejasDoCampo(includeInactive = false): Promise<Igreja[]> {
+  const query = includeInactive ? "?include_inactive=true" : "";
+  const data = await request<unknown>(`/organizations/churches/${query}`);
+  const items = getResults<any>(data);
+  return items.map(mapIgreja);
+}
+
+export async function createIgreja(payload: {
+  nome: string;
+  sigla: string;
+  cidade: string;
+  uf: string;
+  responsavel?: string;
+  membros?: number;
+}) {
+  const data = await request<any>("/organizations/churches/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return mapIgreja(data);
+}
+
+export async function updateIgreja(
+  id: string,
+  payload: Partial<{
+    nome: string;
+    sigla: string;
+    cidade: string;
+    uf: string;
+    responsavel: string;
+    membros: number;
+  }>,
+) {
+  const data = await request<any>(`/organizations/churches/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return mapIgreja(data);
+}
+
+export async function activateIgreja(id: string) {
+  const data = await request<any>(`/organizations/churches/${id}/activate/`, { method: "POST" });
+  return mapIgreja(data);
+}
+
+export async function deactivateIgreja(id: string) {
+  const data = await request<any>(`/organizations/churches/${id}/deactivate/`, { method: "POST" });
+  return mapIgreja(data);
+}
+
+export async function deleteIgreja(id: string) {
+  return request(`/organizations/churches/${id}/`, { method: "DELETE" });
 }

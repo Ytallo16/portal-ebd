@@ -2,12 +2,30 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "h
 
 const ACCESS_KEY = "portal_ebd_access_token";
 const REFRESH_KEY = "portal_ebd_refresh_token";
-const ORG_KEY = "portal_ebd_org_id";
+const USER_EMAIL_KEY = "portal_ebd_user_email";
+const ORG_KEY_FALLBACK = "portal_ebd_org_id";
+
+let contextHydrated = false;
+
+function orgStorageKey() {
+  const email = localStorage.getItem(USER_EMAIL_KEY);
+  return email ? `${ORG_KEY_FALLBACK}_${email}` : ORG_KEY_FALLBACK;
+}
 
 export class UnauthorizedError extends Error {
   constructor(message = "Não autenticado") {
     super(message);
     this.name = "UnauthorizedError";
+  }
+}
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
   }
 }
 
@@ -28,10 +46,25 @@ function setTokens(access: string, refresh: string) {
   localStorage.setItem(REFRESH_KEY, refresh);
 }
 
+export function getSessionUserEmail() {
+  return localStorage.getItem(USER_EMAIL_KEY);
+}
+
+export function setSessionUserEmail(email: string) {
+  localStorage.setItem(USER_EMAIL_KEY, email.trim().toLowerCase());
+}
+
+export function resetContextHydration() {
+  contextHydrated = false;
+}
+
 export function clearSession() {
+  const orgKey = orgStorageKey();
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
-  localStorage.removeItem(ORG_KEY);
+  localStorage.removeItem(orgKey);
+  localStorage.removeItem(USER_EMAIL_KEY);
+  resetContextHydration();
   window.dispatchEvent(new Event("portal-ebd:session-cleared"));
 }
 
@@ -72,7 +105,11 @@ export async function loginWithCredentials(email: string, password: string) {
 
   const data = await response.json();
   setTokens(data.access, data.refresh);
-  localStorage.removeItem(ORG_KEY);
+  setSessionUserEmail(email);
+  resetContextHydration();
+  const orgKey = orgStorageKey();
+  localStorage.removeItem(orgKey);
+  await hydrateOrganizationContext(true);
 }
 
 export async function logoutFromApi() {
@@ -92,16 +129,128 @@ export async function logoutFromApi() {
   }
 }
 
-async function ensureOrgId() {
-  if (localStorage.getItem(ORG_KEY)) {
+export function getActiveOrganizationId() {
+  return localStorage.getItem(orgStorageKey());
+}
+
+export function setActiveOrganizationId(orgId: string) {
+  localStorage.setItem(orgStorageKey(), orgId);
+  window.dispatchEvent(new Event("portal-ebd:org-changed"));
+}
+
+/** Persiste contexto no navegador e no usuário (API); atualiza todo o sistema. */
+export async function switchOrganizationContext(organizationId: string | number) {
+  const id = String(organizationId);
+  setActiveOrganizationId(id);
+  await updateActiveContext(Number(organizationId));
+  contextHydrated = true;
+}
+
+export async function updateActiveContext(organizationId: number) {
+  return request("/me/context", {
+    method: "PATCH",
+    body: JSON.stringify({ organization_id: organizationId }),
+  }, { ensureOrganization: false });
+}
+
+function isIgrejaOperacional(tipo: string) {
+  const t = tipo?.toUpperCase() ?? "";
+  return t === "IGREJA" || t === "FILIAL" || t === "CONGREGACAO";
+}
+
+/** Escolhe igreja operacional para professor/secretário de igreja. */
+function pickOperationalOrganizationId(me: {
+  papeis?: string[];
+  papeis_detalhados?: Array<{ nome?: string; organization_id?: number | null }>;
+  organizacao_ativa?: { id?: number } | null;
+  organizacoes_disponiveis?: Array<{ id?: number; tipo?: string }>;
+}) {
+  const papeis = (me.papeis ?? []).map((p) => p.trim().toUpperCase());
+  const disponiveis = Array.isArray(me.organizacoes_disponiveis) ? me.organizacoes_disponiveis : [];
+  const igrejas = disponiveis.filter((o) => isIgrejaOperacional(o.tipo ?? ""));
+
+  if (papeis.includes("PROFESSOR")) {
+    const papelProfessor = (me.papeis_detalhados ?? []).find(
+      (p) => p.nome?.toUpperCase() === "PROFESSOR" && p.organization_id,
+    );
+    if (papelProfessor?.organization_id) {
+      return papelProfessor.organization_id;
+    }
+  }
+
+  if (me.organizacao_ativa?.id && disponiveis.some((o) => o.id === me.organizacao_ativa?.id)) {
+    return me.organizacao_ativa.id;
+  }
+
+  if (igrejas.length === 1) {
+    return igrejas[0].id ?? null;
+  }
+
+  return null;
+}
+
+/** Restaura contexto salvo (local + servidor) uma vez por sessão de página. */
+export async function hydrateOrganizationContext(force = false) {
+  if (contextHydrated && !force) {
     return;
   }
 
-  const response = await request("/organizations/", { method: "GET" }, { ensureOrganization: false });
-  const organizations = getResults<{ id: number }>(response);
-  if (organizations.length > 0) {
-    localStorage.setItem(ORG_KEY, String(organizations[0].id));
+  try {
+    const me = await request<any>(
+      "/me",
+      { method: "GET" },
+      { ensureOrganization: false, skipOrganizationHeader: true },
+    );
+
+    const disponiveis = Array.isArray(me.organizacoes_disponiveis) ? me.organizacoes_disponiveis : [];
+    const disponivelIds = new Set(disponiveis.map((o: { id: number }) => String(o.id)));
+    let stored = getActiveOrganizationId();
+
+    if (stored && !disponivelIds.has(stored)) {
+      localStorage.removeItem(orgStorageKey());
+      stored = null;
+    }
+
+    const preferredId = pickOperationalOrganizationId(me);
+    const storedNum = stored ? Number(stored) : null;
+
+    if (preferredId != null) {
+      const mustSync = storedNum !== preferredId;
+      setActiveOrganizationId(String(preferredId));
+      if (mustSync) {
+        await updateActiveContext(preferredId);
+      }
+      contextHydrated = true;
+      return;
+    }
+
+    if (stored) {
+      try {
+        await updateActiveContext(Number(stored));
+        contextHydrated = true;
+        return;
+      } catch {
+        localStorage.removeItem(orgStorageKey());
+      }
+    }
+
+    if (disponiveis.length === 1 && disponiveis[0].id != null) {
+      await switchOrganizationContext(disponiveis[0].id);
+      contextHydrated = true;
+      return;
+    }
+  } catch {
+    const stored = getActiveOrganizationId();
+    if (stored) {
+      try {
+        await updateActiveContext(Number(stored));
+      } catch {
+        localStorage.removeItem(orgStorageKey());
+      }
+    }
   }
+
+  contextHydrated = true;
 }
 
 export function getResults<T>(data: unknown): T[] {
@@ -117,7 +266,7 @@ export function getResults<T>(data: unknown): T[] {
 export async function request<T = unknown>(
   path: string,
   init: RequestInit = {},
-  options: { ensureOrganization?: boolean } = {},
+  options: { ensureOrganization?: boolean; skipOrganizationHeader?: boolean } = {},
 ): Promise<T> {
   let access = getAccessToken();
   if (!access) {
@@ -125,17 +274,19 @@ export async function request<T = unknown>(
   }
 
   if (options.ensureOrganization !== false) {
-    await ensureOrgId();
+    await hydrateOrganizationContext();
   }
 
-  const orgId = localStorage.getItem(ORG_KEY);
+  const orgId = getActiveOrganizationId();
 
   const headers = new Headers(init.headers || {});
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   headers.set("Authorization", `Bearer ${access}`);
-  if (orgId) headers.set("X-Organization-Id", orgId);
+  if (orgId && !options.skipOrganizationHeader) {
+    headers.set("X-Organization-Id", orgId);
+  }
 
   let response = await fetch(url(path), { ...init, headers });
 
@@ -157,7 +308,7 @@ export async function request<T = unknown>(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Erro HTTP ${response.status}`);
+    throw new ApiError(text || `Erro HTTP ${response.status}`, response.status);
   }
 
   if (response.status === 204) {

@@ -19,7 +19,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchUsuarioLogado, fetchUsuarios, resetUserPassword, toggleUserActive, updateUsuario, type Usuario } from "@/lib/portalApi";
+import { usePermissions } from "@/auth/usePermissions";
+import { fetchUsuarios, resetUserPassword, toggleUserActive, updateUsuario, type Usuario } from "@/lib/portalApi";
 import { getIniciais } from "@/lib/formatters";
 
 export default function Usuarios() {
@@ -32,8 +33,7 @@ export default function Usuarios() {
   const [editForm, setEditForm] = useState({ nome: "", email: "", isActive: true });
 
   const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
-  const { data: usuarioLogado } = useQuery({ queryKey: ["me"], queryFn: fetchUsuarioLogado });
-  const isAdminGeral = Boolean(usuarioLogado?.isAdminGeral);
+  const { isAdminSistema, can } = usePermissions();
   const toggleMutation = useMutation({
     mutationFn: (userId: string) => toggleUserActive(userId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["usuarios"] }),
@@ -144,7 +144,7 @@ export default function Usuarios() {
                   <Switch checked={u.status === "Ativo"} onCheckedChange={() => toggleMutation.mutate(u.id)} />
                   <span className="text-xs text-muted-foreground hidden sm:inline">{u.status}</span>
                 </div>
-                {isAdminGeral ? (
+                {isAdminSistema && can("usuarios", "editar") ? (
                   <Button
                     variant="ghost"
                     size="icon"

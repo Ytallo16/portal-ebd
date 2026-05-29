@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +6,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Users, TrendingUp, DollarSign, UserPlus, BookOpen, CalendarDays,
 } from "lucide-react";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
+import { isSomenteProfessor } from "@/lib/chamada";
+import DashboardProfessor from "@/pages/DashboardProfessor";
 import {
   fetchDashboardAttendanceEvolution,
   fetchDashboardBirthdays,
@@ -14,6 +16,7 @@ import {
   fetchDashboardOfferingEvolution,
   fetchDashboardSummary,
   fetchLicoes,
+  isTipoCampo,
   weekLabel,
 } from "@/lib/portalApi";
 import { formatCurrency, getIniciais } from "@/lib/formatters";
@@ -23,12 +26,45 @@ import {
 } from "recharts";
 
 export default function Dashboard() {
-  const { data: summary } = useQuery({ queryKey: ["dash-summary"], queryFn: fetchDashboardSummary });
-  const { data: attendanceEvolution = [] } = useQuery({ queryKey: ["dash-attendance"], queryFn: fetchDashboardAttendanceEvolution });
-  const { data: classComposition = [] } = useQuery({ queryKey: ["dash-composition"], queryFn: fetchDashboardClassComposition });
-  const { data: offeringEvolution = [] } = useQuery({ queryKey: ["dash-offering"], queryFn: fetchDashboardOfferingEvolution });
-  const { data: birthdays = [] } = useQuery({ queryKey: ["dash-birthdays"], queryFn: fetchDashboardBirthdays });
-  const { data: licoes = [] } = useQuery({ queryKey: ["licoes"], queryFn: () => fetchLicoes() });
+  const { isAdminSistema, hasRole } = usePermissions();
+  const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
+
+  if (somenteProfessor) {
+    return <DashboardProfessor />;
+  }
+
+  return <DashboardIgreja />;
+}
+
+function DashboardIgreja() {
+  const { organizacaoAtiva, activeOrgId } = usePermissions();
+  const contextoCampo = Boolean(organizacaoAtiva && isTipoCampo(organizacaoAtiva.tipo));
+
+  const { data: summary } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "dash-summary"),
+    queryFn: fetchDashboardSummary,
+  });
+  const { data: attendanceEvolution = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "dash-attendance"),
+    queryFn: fetchDashboardAttendanceEvolution,
+  });
+  const { data: classComposition = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "dash-composition"),
+    queryFn: fetchDashboardClassComposition,
+  });
+  const { data: offeringEvolution = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "dash-offering"),
+    queryFn: fetchDashboardOfferingEvolution,
+  });
+  const { data: birthdays = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "dash-birthdays"),
+    queryFn: fetchDashboardBirthdays,
+  });
+  const { data: licoes = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "licoes"),
+    queryFn: () => fetchLicoes(),
+    enabled: !contextoCampo,
+  });
 
   const hoje = new Date();
   const dataFormatada = hoje.toLocaleDateString("pt-BR", {
@@ -53,8 +89,10 @@ export default function Dashboard() {
   }));
 
   const totalOfertas = offeringEvolution.reduce((acc: number, item: any) => acc + Number(item.total), 0);
+  const presentes = summary?.attendance?.presentes ?? 0;
+  const ausentes = summary?.attendance?.ausentes ?? 0;
   const frequenciaMedia = summary
-    ? Math.round((summary.attendance.presentes / Math.max(summary.attendance.presentes + summary.attendance.ausentes, 1)) * 100)
+    ? Math.round((presentes / Math.max(presentes + ausentes, 1)) * 100)
     : 0;
 
   const kpis = [

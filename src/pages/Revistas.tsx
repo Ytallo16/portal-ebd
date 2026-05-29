@@ -7,17 +7,24 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, BookMarked, CheckCircle, Clock, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { fetchPublicationControls, fetchTurmas, updatePublicationControl } from "@/lib/portalApi";
 
 export default function Revistas() {
   const queryClient = useQueryClient();
+  const { activeOrgId, podeCarregarOperacional } = usePermissions();
   const [selectedTurma, setSelectedTurma] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
+  const { data: turmas = [], isLoading: loadingTurmas } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "turmas"),
+    queryFn: fetchTurmas,
+    enabled: podeCarregarOperacional,
+  });
   const { data: controleRevistas = [], isLoading: loadingRevistas } = useQuery({
-    queryKey: ["revistas", selectedTurma],
+    queryKey: orgQueryKey(activeOrgId, "revistas", selectedTurma),
     queryFn: () => fetchPublicationControls(selectedTurma ?? undefined),
+    enabled: podeCarregarOperacional,
   });
 
   const toggleMutation = useMutation({

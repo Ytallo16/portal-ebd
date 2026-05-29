@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Moon, Sun, Bell, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,25 +19,27 @@ import {
 import { useSidebar } from "@/components/ui/sidebar";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/hooks/useTheme";
-import { useQuery } from "@tanstack/react-query";
-import { fetchUsuarioLogado } from "@/lib/portalApi";
+import { usePermissions } from "@/auth/usePermissions";
+import { OrgContextSwitcher } from "@/components/layout/OrgContextSwitcher";
+import { getLicoesBreadcrumbs, getLicoesPageTitle } from "@/components/layout/licoesBreadcrumbs";
+import { isSomenteProfessor } from "@/lib/chamada";
 import { useAuth } from "@/auth/AuthProvider";
 
-function getPageTitle(pathname: string) {
+function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boolean }) {
+  const licoesTitle = getLicoesPageTitle(pathname, licoesOptions);
+  if (licoesTitle) return licoesTitle;
+  if (matchPath("/trimestres", pathname)) return "Lições";
+
   if (matchPath("/", pathname)) return "Dashboard";
-  if (matchPath("/licoes", pathname)) return "Lições";
-  if (matchPath("/trimestres", pathname)) return "Trimestres";
-  if (matchPath("/licoes/:id", pathname)) return "Detalhes da Lição";
-  if (matchPath("/licoes/:id/classe/:classId", pathname)) return "Detalhes da Classe";
   if (matchPath("/turmas", pathname)) return "Turmas";
   if (matchPath("/turmas/:id/licoes", pathname)) return "Lições da Turma";
   if (matchPath("/turmas/:id", pathname)) return "Detalhes da Turma";
   if (matchPath("/alunos", pathname)) return "Alunos";
   if (matchPath("/financeiro", pathname)) return "Financeiro";
   if (matchPath("/revistas", pathname)) return "Revistas";
+  if (matchPath("/igrejas", pathname)) return "Igrejas";
   if (matchPath("/configuracoes/usuarios", pathname)) return "Usuários";
   if (matchPath("/configuracoes/perfis-permissoes", pathname)) return "Perfis e permissões";
-  if (matchPath("/configuracoes/trimestres", pathname)) return "Trimestres";
   if (matchPath("/configuracoes/organizacoes/:id", pathname)) return "Detalhes da Organização";
   if (matchPath("/configuracoes/organizacoes", pathname)) return "Organizações";
   if (matchPath("/configuracoes", pathname)) return "Configurações";
@@ -44,16 +47,14 @@ function getPageTitle(pathname: string) {
   return "Portal EBD";
 }
 
-function getBreadcrumbs(pathname: string) {
+function getBreadcrumbs(pathname: string, licoesOptions?: { somenteProfessor?: boolean }) {
+  const licoesCrumbs = getLicoesBreadcrumbs(pathname, licoesOptions);
+  if (licoesCrumbs) return licoesCrumbs;
+  if (matchPath("/trimestres", pathname)) {
+    return [{ label: "Lições", to: "/licoes" }, { label: "Gerenciar trimestres" }];
+  }
+
   if (matchPath("/", pathname)) return [{ label: "Dashboard" }];
-  if (matchPath("/licoes", pathname)) return [{ label: "Lições" }];
-  if (matchPath("/trimestres", pathname)) return [{ label: "Trimestres" }];
-  if (matchPath("/licoes/:id", pathname)) {
-    return [{ label: "Lições", to: "/licoes" }, { label: "Detalhes da Lição" }];
-  }
-  if (matchPath("/licoes/:id/classe/:classId", pathname)) {
-    return [{ label: "Lições", to: "/licoes" }, { label: "Detalhes da Lição" }, { label: "Detalhes da Classe" }];
-  }
   if (matchPath("/turmas", pathname)) return [{ label: "Turmas" }];
   if (matchPath("/turmas/:id", pathname)) {
     return [{ label: "Turmas", to: "/turmas" }, { label: "Detalhes da Turma" }];
@@ -64,15 +65,13 @@ function getBreadcrumbs(pathname: string) {
   if (matchPath("/alunos", pathname)) return [{ label: "Alunos" }];
   if (matchPath("/financeiro", pathname)) return [{ label: "Financeiro" }];
   if (matchPath("/revistas", pathname)) return [{ label: "Revistas" }];
+  if (matchPath("/igrejas", pathname)) return [{ label: "Igrejas" }];
   if (matchPath("/configuracoes", pathname)) return [{ label: "Configurações" }];
   if (matchPath("/configuracoes/usuarios", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Usuários" }];
   }
   if (matchPath("/configuracoes/perfis-permissoes", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Perfis e permissões" }];
-  }
-  if (matchPath("/configuracoes/trimestres", pathname)) {
-    return [{ label: "Configurações", to: "/configuracoes" }, { label: "Trimestres" }];
   }
   if (matchPath("/configuracoes/organizacoes", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Organizações" }];
@@ -90,12 +89,15 @@ export function AppHeader() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { logout } = useAuth();
-  const { data: usuarioLogado } = useQuery({ queryKey: ["me"], queryFn: fetchUsuarioLogado });
-  const pageTitle = getPageTitle(location.pathname);
-  const breadcrumbs = getBreadcrumbs(location.pathname);
+  const { usuario: usuarioLogado, isAdminSistema, hasRole } = usePermissions();
+  const licoesNavOptions = {
+    somenteProfessor: isSomenteProfessor({ isAdminSistema, hasRole }),
+  };
+  const pageTitle = getPageTitle(location.pathname, licoesNavOptions);
+  const breadcrumbs = getBreadcrumbs(location.pathname, licoesNavOptions);
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b bg-card px-3 py-2 md:px-4 md:py-0">
+    <header className="z-30 flex min-h-14 shrink-0 items-center gap-2 border-b bg-card px-3 py-2 md:px-4 md:py-0">
       <Button
         variant="ghost"
         size="icon"
@@ -110,22 +112,26 @@ export function AppHeader() {
         <Breadcrumb className="hidden md:block">
           <BreadcrumbList>
             {breadcrumbs.map((crumb, index) => (
-              <BreadcrumbItem key={`${crumb.label}-${index}`}>
+              <Fragment key={`${crumb.label}-${index}`}>
                 {index > 0 && <BreadcrumbSeparator />}
-                {crumb.to ? (
-                  <BreadcrumbLink asChild>
-                    <Link to={crumb.to}>{crumb.label}</Link>
-                  </BreadcrumbLink>
-                ) : (
-                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                )}
-              </BreadcrumbItem>
+                <BreadcrumbItem>
+                  {crumb.to ? (
+                    <BreadcrumbLink asChild>
+                      <Link to={crumb.to}>{crumb.label}</Link>
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+              </Fragment>
             ))}
           </BreadcrumbList>
         </Breadcrumb>
       </div>
 
-      <div className="hidden flex-1 md:block" />
+      <div className="flex min-w-0 flex-1 items-center justify-end px-1 sm:px-2">
+        <OrgContextSwitcher variant="header" />
+      </div>
 
       <Button variant="ghost" size="icon" className="touch-target" onClick={toggleTheme}>
         {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

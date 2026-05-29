@@ -7,7 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarRange, Pencil, Plus, Trash2 } from "lucide-react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowLeft, CalendarRange, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { licoesTrimestrePath } from "@/lib/licoesRoutes";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
+import { podeGerenciarTrimestres } from "@/lib/chamada";
 import { createTrimestre, deleteTrimestre, fetchTrimestres, type Trimestre, updateTrimestre } from "@/lib/portalApi";
 
 type FormState = {
@@ -39,8 +43,18 @@ function deriveNumeroEAno(dataInicio: string, fallback?: { numero: number; ano: 
 }
 
 export default function Trimestres() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: trimestres = [], isLoading } = useQuery({ queryKey: ["trimestres"], queryFn: fetchTrimestres });
+  const { activeOrgId, podeCarregarOperacional, isAdminSistema, hasRole } = usePermissions();
+
+  if (!podeGerenciarTrimestres({ isAdminSistema, hasRole })) {
+    return <Navigate to="/licoes" replace />;
+  }
+  const { data: trimestres = [], isLoading } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "trimestres"),
+    queryFn: fetchTrimestres,
+    enabled: podeCarregarOperacional,
+  });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Trimestre | null>(null);
@@ -107,11 +121,16 @@ export default function Trimestres() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Trimestres</h1>
-          <p className="text-sm text-muted-foreground">
-            Crie trimestres com data de início/fim e quantidade de lições.
-          </p>
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" className="touch-target shrink-0" onClick={() => navigate("/licoes")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Gerenciar trimestres</h1>
+            <p className="text-sm text-muted-foreground">
+              Cadastre períodos, datas e quantidade de lições de cada trimestre.
+            </p>
+          </div>
         </div>
         <Button className="w-full sm:w-auto" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -148,8 +167,17 @@ export default function Trimestres() {
               </TableHeader>
               <TableBody>
                 {trimestres.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.numero}º/{item.ano}</TableCell>
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer"
+                    onClick={() => navigate(licoesTrimestrePath(item.ano, item.numero))}
+                  >
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-2">
+                        {item.numero}º/{item.ano}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                    </TableCell>
                     <TableCell>{item.dataInicio || "—"} até {item.dataFim || "—"}</TableCell>
                     <TableCell>{item.quantidadeLicoes}</TableCell>
                     <TableCell>
@@ -159,10 +187,24 @@ export default function Trimestres() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex gap-2">
-                        <Button size="icon" variant="outline" onClick={() => openEdit(item)}>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(item);
+                          }}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="destructive" onClick={() => deleteMutation.mutate(item.id)}>
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteMutation.mutate(item.id);
+                          }}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

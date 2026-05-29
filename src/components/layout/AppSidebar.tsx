@@ -1,16 +1,16 @@
 import {
   LayoutDashboard,
   BookOpen,
-  CalendarRange,
   Users,
   GraduationCap,
   DollarSign,
   BookMarked,
+  Church,
   Settings,
   ChevronRight,
   LogOut,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -30,25 +30,35 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { fetchUsuarioLogado } from "@/lib/portalApi";
+import { usePermissions } from "@/auth/usePermissions";
+import { isSomenteProfessor } from "@/lib/chamada";
 import { useAuth } from "@/auth/AuthProvider";
+import type { ModuloPermissao } from "@/lib/portalApi";
 
-const items = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Lições", url: "/licoes", icon: BookOpen },
-  { title: "Trimestres", url: "/trimestres", icon: CalendarRange },
-  { title: "Turmas", url: "/turmas", icon: GraduationCap },
-  { title: "Alunos", url: "/alunos", icon: Users },
-  { title: "Financeiro", url: "/financeiro", icon: DollarSign },
-  { title: "Revistas", url: "/revistas", icon: BookMarked },
+const items: Array<{
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  modulo: ModuloPermissao;
+  hideForProfessor?: boolean;
+}> = [
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, modulo: "dashboard" },
+  { title: "Lições", url: "/licoes", icon: BookOpen, modulo: "licoes" },
+  { title: "Turmas", url: "/turmas", icon: GraduationCap, modulo: "turmas" },
+  { title: "Alunos", url: "/alunos", icon: Users, modulo: "alunos" },
+  { title: "Financeiro", url: "/financeiro", icon: DollarSign, modulo: "financeiro", hideForProfessor: true },
+  { title: "Revistas", url: "/revistas", icon: BookMarked, modulo: "revistas", hideForProfessor: true },
 ];
 
-const configuracaoItems = [
-  { title: "Usuários", url: "/configuracoes/usuarios" },
-  { title: "Perfis e permissões", url: "/configuracoes/perfis-permissoes" },
-  { title: "Trimestres", url: "/configuracoes/trimestres" },
-  { title: "Organizações", url: "/configuracoes/organizacoes" },
+const configuracaoItems: Array<{
+  title: string;
+  url: string;
+  modulo: ModuloPermissao;
+  adminOnly?: boolean;
+}> = [
+  { title: "Usuários", url: "/configuracoes/usuarios", modulo: "usuarios" },
+  { title: "Perfis e permissões", url: "/configuracoes/perfis-permissoes", modulo: "usuarios" },
+  { title: "Organizações", url: "/configuracoes/organizacoes", modulo: "organizacoes", adminOnly: true },
 ];
 
 export function AppSidebar() {
@@ -57,9 +67,34 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const { data: usuarioLogado } = useQuery({ queryKey: ["me"], queryFn: fetchUsuarioLogado });
-  const isAdminGeral = Boolean(usuarioLogado?.isAdminGeral);
-  const menuItems = isAdminGeral ? [] : items;
+  const { can, isAdminSistema, hasRole, usuario, organizacaoAtiva } = usePermissions();
+  const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
+  const secretarioCampo =
+    !isAdminSistema && (usuario?.papeis ?? []).some((p) => p.trim().toUpperCase() === "SECRETARIO_CAMPO");
+  const showIgrejasMenu =
+    (secretarioCampo || isAdminSistema) && (isAdminSistema || can("organizacoes", "visualizar"));
+
+  const menuItems = useMemo(() => {
+    const base = items.filter((item) => {
+      if (item.hideForProfessor && somenteProfessor) return false;
+      return isAdminSistema || can(item.modulo, "visualizar");
+    });
+    if (!showIgrejasMenu) {
+      return base;
+    }
+    return [
+      ...base.slice(0, 1),
+      { title: "Igrejas", url: "/igrejas", icon: Church, modulo: "organizacoes" as ModuloPermissao },
+      ...base.slice(1),
+    ];
+  }, [can, isAdminSistema, showIgrejasMenu, somenteProfessor]);
+  const configItems = useMemo(
+    () =>
+      configuracaoItems.filter((item) =>
+        item.adminOnly ? isAdminSistema : isAdminSistema || can(item.modulo, "visualizar"),
+      ),
+    [can, isAdminSistema],
+  );
   const settingsIsActive = location.pathname.startsWith("/configuracoes");
   const [settingsOpen, setSettingsOpen] = useState(settingsIsActive);
   const closeOnMobile = () => {
@@ -73,16 +108,10 @@ export function AppSidebar() {
   }, [settingsIsActive]);
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="flex items-center gap-2 px-3 py-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground font-bold text-sm">
-          EBD
-        </div>
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader className="px-3 py-2">
         {!collapsed && (
-          <div className="flex flex-col leading-tight">
-            <span className="font-bold text-sm text-sidebar-foreground">Portal EBD</span>
-            <span className="text-[11px] text-sidebar-muted">AD Dirceu</span>
-          </div>
+          <span className="text-sm font-semibold text-sidebar-foreground">Portal EBD</span>
         )}
       </SidebarHeader>
       <SidebarContent>
@@ -111,48 +140,22 @@ export function AppSidebar() {
                 );
               })}
 
-              {collapsed ? (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={settingsIsActive} tooltip="Configurações">
-                    <NavLink
-                      to="/configuracoes"
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      onClick={closeOnMobile}
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ) : (
-                <SidebarMenuItem>
-                  {isAdminGeral ? (
-                    <div className="space-y-1">
-                      <SidebarMenuButton isActive={settingsIsActive}>
+              {configItems.length > 0 && (
+                collapsed ? (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={settingsIsActive} tooltip="Configurações">
+                      <NavLink
+                        to="/configuracoes"
+                        className="hover:bg-sidebar-accent/50"
+                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        onClick={closeOnMobile}
+                      >
                         <Settings className="mr-2 h-4 w-4" />
-                        <span className="flex-1">Configurações</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuSub>
-                        {configuracaoItems.map((item) => {
-                          const isSubItemActive = location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
-                          return (
-                            <SidebarMenuSubItem key={item.title}>
-                              <SidebarMenuSubButton asChild isActive={isSubItemActive}>
-                                <NavLink
-                                  to={item.url}
-                                  className="hover:bg-sidebar-accent/50"
-                                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                                  onClick={closeOnMobile}
-                                >
-                                  <span>{item.title}</span>
-                                </NavLink>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </div>
-                  ) : (
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ) : (
+                  <SidebarMenuItem>
                     <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton isActive={settingsIsActive}>
@@ -166,7 +169,7 @@ export function AppSidebar() {
 
                       <CollapsibleContent>
                         <SidebarMenuSub>
-                          {configuracaoItems.map((item) => {
+                          {configItems.map((item) => {
                             const isSubItemActive = location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
                             return (
                               <SidebarMenuSubItem key={item.title}>
@@ -186,8 +189,8 @@ export function AppSidebar() {
                         </SidebarMenuSub>
                       </CollapsibleContent>
                     </Collapsible>
-                  )}
-                </SidebarMenuItem>
+                  </SidebarMenuItem>
+                )
               )}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -213,7 +216,6 @@ export function AppSidebar() {
             <button
               type="button"
               onClick={() => {
-                if (isAdminGeral) return;
                 closeOnMobile();
                 navigate("/meu-perfil");
               }}
@@ -221,14 +223,14 @@ export function AppSidebar() {
             >
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
-                  {usuarioLogado?.iniciais ?? "--"}
+                  {usuario?.iniciais ?? "--"}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-sidebar-foreground">
-                    {usuarioLogado?.nome ?? "Usuário"}
+                    {usuario?.nome ?? "Usuário"}
                   </p>
                   <p className="truncate text-xs text-sidebar-muted">
-                    {usuarioLogado?.email ?? "sem-email"}
+                    {organizacaoAtiva?.nome ?? usuario?.papel ?? "sem contexto"}
                   </p>
                 </div>
               </div>

@@ -8,15 +8,25 @@ import {
   BarChart, Bar,
 } from "recharts";
 import { DollarSign, TrendingUp, Award } from "lucide-react";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { fetchOfferings, fetchTurmas, monthLabel } from "@/lib/portalApi";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 
 export default function Financeiro() {
   const [modo, setModo] = useState("geral");
   const [turmaFilter, setTurmaFilter] = useState("todas");
+  const { activeOrgId, podeCarregarOperacional } = usePermissions();
 
-  const { data: turmas = [] } = useQuery({ queryKey: ["turmas"], queryFn: fetchTurmas });
-  const { data: ofertas = [], isLoading } = useQuery({ queryKey: ["offerings"], queryFn: () => fetchOfferings() });
+  const { data: turmas = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "turmas"),
+    queryFn: fetchTurmas,
+    enabled: podeCarregarOperacional,
+  });
+  const { data: ofertas = [], isLoading } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "offerings"),
+    queryFn: () => fetchOfferings(),
+    enabled: podeCarregarOperacional,
+  });
 
   const turmaById = useMemo(() => new Map(turmas.map((t) => [t.id, t.nome])), [turmas]);
 

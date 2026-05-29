@@ -2,8 +2,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Users, ChevronRight, ShieldCheck, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { usePermissions } from "@/auth/usePermissions";
+
 export default function Configuracoes() {
   const navigate = useNavigate();
+  const { isAdminSistema } = usePermissions();
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -41,21 +44,23 @@ export default function Configuracoes() {
           </CardContent>
         </Card>
 
-        <Card
-          className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-          onClick={() => navigate("/configuracoes/organizacoes")}
-        >
-          <CardContent className="p-5 sm:p-6 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Building2 className="h-6 w-6 text-primary" />
-              <div className="min-w-0">
-                <p className="font-semibold">Organizações</p>
-                <p className="text-sm text-muted-foreground">Gerenciar matriz, filiais e congregações</p>
+        {isAdminSistema && (
+          <Card
+            className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+            onClick={() => navigate("/configuracoes/organizacoes")}
+          >
+            <CardContent className="p-5 sm:p-6 flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-6 w-6 text-primary" />
+                <div className="min-w-0">
+                  <p className="font-semibold">Organizações</p>
+                  <p className="text-sm text-muted-foreground">Gerenciar matriz, filiais e congregações</p>
+                </div>
               </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </CardContent>
-        </Card>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
