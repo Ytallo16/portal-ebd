@@ -11,7 +11,7 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="flex h-svh w-full overflow-hidden">
+      <div className="flex h-svh w-full overflow-hidden bg-muted/40">
         <AppSidebar />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <AppHeader />

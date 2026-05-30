@@ -8,12 +8,22 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Users, GraduationCap, Plus } from "lucide-react";
+import { GraduationCap, Plus, Search, UserRound, Users } from "lucide-react";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
-import { createAluno, fetchAlunos, fetchTurmas } from "@/lib/portalApi";
+import {
+  buildMatriculados,
+  createAluno,
+  fetchAlunos,
+  fetchTurmas,
+  type Matriculado,
+} from "@/lib/portalApi";
 import { formatarTelefone, getIniciais } from "@/lib/formatters";
 import { AlunoDetalheModal } from "@/pages/AlunoDetalheModal";
+
+function matriculadoTipoLabel(tipo: Matriculado["tipo"]) {
+  return tipo === "PROFESSOR" ? "Professor" : "Aluno";
+}
 
 export default function Alunos() {
   const queryClient = useQueryClient();
@@ -26,7 +36,7 @@ export default function Alunos() {
     turmasProfessor,
   } = usePermissions();
   const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
-  const podeCriarAluno = can("alunos", "criar");
+  const podeCriarMatriculado = can("alunos", "criar");
   const [search, setSearch] = useState("");
   const [selectedAlunoId, setSelectedAlunoId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -51,7 +61,10 @@ export default function Alunos() {
   });
   const createMutation = useMutation({
     mutationFn: createAluno,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["alunos"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alunos"] });
+      queryClient.invalidateQueries({ queryKey: ["turmas"] });
+    },
   });
 
   const turmaNameById = useMemo(() => {
@@ -72,19 +85,23 @@ export default function Alunos() {
     [turmasProfessor],
   );
 
-  const alunosVisiveis = useMemo(() => {
-    if (!somenteProfessor) return alunos;
-    return alunos.filter((a) => idsTurmasProfessor.has(a.turmaId));
-  }, [alunos, somenteProfessor, idsTurmasProfessor]);
+  const matriculadosVisiveis = useMemo(() => {
+    const todos = buildMatriculados(alunos, turmas);
+    if (!somenteProfessor) return todos;
+    return todos.filter((item) => idsTurmasProfessor.has(item.turmaId));
+  }, [alunos, turmas, somenteProfessor, idsTurmasProfessor]);
 
-  const filtered = alunosVisiveis.filter((a) => {
-    const matchNome = a.nome.toLowerCase().includes(search.toLowerCase());
-    if (somenteProfessor) return matchNome;
+  const filtered = matriculadosVisiveis.filter((item) => {
+    const termo = search.toLowerCase();
     return (
-      matchNome ||
-      (turmaNameById.get(a.turmaId) ?? "").toLowerCase().includes(search.toLowerCase())
+      item.nome.toLowerCase().includes(termo) ||
+      item.turmaNome.toLowerCase().includes(termo) ||
+      matriculadoTipoLabel(item.tipo).toLowerCase().includes(termo)
     );
   });
+
+  const totalAlunos = matriculadosVisiveis.filter((item) => item.tipo === "ALUNO").length;
+  const totalProfessores = matriculadosVisiveis.filter((item) => item.tipo === "PROFESSOR").length;
 
   const turmaIdProfessor = useMemo(() => {
     if (!somenteProfessor || turmasProfessor.length === 0) return "";
@@ -97,7 +114,7 @@ export default function Alunos() {
     ? turmas.filter((t) => idsTurmasProfessor.has(t.id))
     : turmas;
 
-  function abrirNovoAluno() {
+  function abrirNovoMatriculado() {
     setForm((prev) => ({
       ...prev,
       turmaId: somenteProfessor ? turmaIdProfessor : prev.turmaId,
@@ -106,12 +123,10 @@ export default function Alunos() {
   }
 
   const selectedAluno =
-    filtered.find((a) => a.id === selectedAlunoId) ??
-    alunosVisiveis.find((a) => a.id === selectedAlunoId) ??
-    null;
+    alunos.find((a) => a.id === selectedAlunoId) ?? null;
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando alunos...</p>;
+    return <p className="text-sm text-muted-foreground">Carregando matriculados...</p>;
   }
 
   async function onCreateSubmit(e: React.FormEvent) {
@@ -127,11 +142,11 @@ export default function Alunos() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Alunos</h1>
-        {podeCriarAluno && (
-          <Button className="w-full sm:w-auto" onClick={abrirNovoAluno}>
+        <h1 className="text-2xl font-bold">Matriculados</h1>
+        {podeCriarMatriculado && (
+          <Button className="w-full sm:w-auto" onClick={abrirNovoMatriculado}>
             <Plus className="mr-2 h-4 w-4" />
-            Novo Aluno
+            Novo matriculado
           </Button>
         )}
       </div>
@@ -139,66 +154,88 @@ export default function Alunos() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder={somenteProfessor ? "Buscar aluno..." : "Buscar por nome ou turma..."}
+          placeholder={
+            somenteProfessor
+              ? "Buscar matriculado..."
+              : "Buscar por nome, turma ou tipo..."
+          }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10 touch-target"
         />
       </div>
 
-      <div className={`grid grid-cols-1 gap-4 ${somenteProfessor ? "" : "sm:grid-cols-2"}`}>
+      <div className={`grid grid-cols-1 gap-4 ${somenteProfessor ? "sm:grid-cols-3" : "sm:grid-cols-3"}`}>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Users className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-xl font-bold">{alunosVisiveis.length}</p>
-              <p className="text-xs text-muted-foreground">
-                {somenteProfessor ? "Alunos da turma" : "Total de Alunos"}
-              </p>
+              <p className="text-xl font-bold">{matriculadosVisiveis.length}</p>
+              <p className="text-xs text-muted-foreground">Total</p>
             </div>
           </CardContent>
         </Card>
-        {!somenteProfessor && (
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <GraduationCap className="h-5 w-5 text-secondary" />
-              <div>
-                <p className="text-xl font-bold">{turmas.length}</p>
-                <p className="text-xs text-muted-foreground">Total de Turmas</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <UserRound className="h-5 w-5 text-secondary" />
+            <div>
+              <p className="text-xl font-bold">{totalAlunos}</p>
+              <p className="text-xs text-muted-foreground">Alunos</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <GraduationCap className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-xl font-bold">{totalProfessores}</p>
+              <p className="text-xs text-muted-foreground">Professores</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">
-            Nenhum aluno encontrado.
+            Nenhum matriculado encontrado.
           </p>
         ) : (
-          filtered.map((a) => (
-          <Card
-            key={a.id}
-            className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-            onClick={() => setSelectedAlunoId(a.id)}
-          >
-            <CardContent className="flex items-center gap-3 p-4">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                  {getIniciais(a.nome)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium truncate">{a.nome}</p>
-                {!somenteProfessor && (
-                  <Badge variant="secondary" className="text-xs mt-1">
-                    {turmaNameById.get(a.turmaId) ?? "—"}
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          filtered.map((item) => (
+            <Card
+              key={item.id}
+              className={`transition-all ${item.tipo === "ALUNO" ? "cursor-pointer hover:ring-2 hover:ring-primary/50" : ""}`}
+              onClick={() => {
+                if (item.alunoId) setSelectedAlunoId(item.alunoId);
+              }}
+            >
+              <CardContent className="flex items-center gap-3 p-4">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback
+                    className={
+                      item.tipo === "PROFESSOR"
+                        ? "bg-secondary text-secondary-foreground text-sm font-semibold"
+                        : "bg-primary text-primary-foreground text-sm font-semibold"
+                    }
+                  >
+                    {getIniciais(item.nome)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{item.nome}</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <Badge variant={item.tipo === "PROFESSOR" ? "default" : "secondary"} className="text-xs">
+                      {matriculadoTipoLabel(item.tipo)}
+                    </Badge>
+                    {(!somenteProfessor || turmasProfessor.length > 1) && (
+                      <Badge variant="outline" className="text-xs">
+                        {item.turmaNome || turmaNameById.get(item.turmaId) || "—"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
@@ -222,7 +259,7 @@ export default function Alunos() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Novo Aluno</DialogTitle>
+            <DialogTitle>Novo matriculado</DialogTitle>
             {somenteProfessor && turmaNomeProfessor && (
               <p className="text-sm text-muted-foreground">
                 O aluno será cadastrado na turma {turmaNomeProfessor}.

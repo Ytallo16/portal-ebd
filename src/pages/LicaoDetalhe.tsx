@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import {
   DollarSign,
   CheckCircle,
   Loader2,
+  Users,
 } from "lucide-react";
 
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
@@ -26,6 +27,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   chamadaStatusLabel,
   getChamadaTurmaStatus,
   isSecretarioOuAdmin,
@@ -34,9 +42,11 @@ import {
 } from "@/lib/chamada";
 import {
   fetchAttendanceSheets,
+  fetchLessonSchedules,
   fetchLicoes,
   fetchTurmas,
   finalizeLesson,
+  saveLessonSchedulesBulk,
   type FinalizeLessonError,
 } from "@/lib/portalApi";
 import {
@@ -81,6 +91,7 @@ export default function LicaoDetalhe() {
     [turmasProfessor],
   );
   const [confirmFinalize, setConfirmFinalize] = useState(false);
+  const [escalaForm, setEscalaForm] = useState<Record<string, string>>({});
 
   const ano = Number(anoParam);
   const trimestre = Number(trimestreParam);
@@ -139,6 +150,49 @@ export default function LicaoDetalhe() {
     enabled: podeCarregarOperacional,
   });
 
+  const podeEscalarProfessores =
+    secretarioOuAdmin && (can("licoes", "editar") || can("licoes", "criar"));
+
+  const { data: escalas = [] } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "lesson-schedules", lessonId),
+    queryFn: () => fetchLessonSchedules({ lessonId: lessonId! }),
+    enabled: podeCarregarOperacional && Boolean(lessonId),
+  });
+
+  useEffect(() => {
+    if (!lessonId) return;
+    const next: Record<string, string> = {};
+    turmas.forEach((turma) => {
+      const escala = escalas.find((item) => item.classGroupId === turma.id);
+      next[turma.id] = escala?.professorId ?? "";
+    });
+    setEscalaForm(next);
+  }, [lessonId, escalas, turmas]);
+
+  const saveEscalaMutation = useMutation({
+    mutationFn: () => {
+      if (!lessonId) throw new Error("Lição inválida");
+      return saveLessonSchedulesBulk(
+        lessonId,
+        turmas.map((turma) => ({
+          classGroupId: turma.id,
+          professorId: escalaForm[turma.id] || null,
+        })),
+      );
+    },
+    onSuccess: () => {
+      toast.success("Escala de professores salva.");
+      void queryClient.invalidateQueries({ queryKey: ["lesson-schedules"] });
+    },
+    onError: () => toast.error("Não foi possível salvar a escala."),
+  });
+
+  const escalaPorTurma = useMemo(() => {
+    const map = new Map<string, (typeof escalas)[number]>();
+    escalas.forEach((item) => map.set(item.classGroupId, item));
+    return map;
+  }, [escalas]);
+
   const turmasBase = useMemo(() => {
     if (isProfessor) {
       return turmas.filter((t) => idsTurmasProfessor.has(t.id));
@@ -159,7 +213,7 @@ export default function LicaoDetalhe() {
           ? t.professorUsers.find((p) => p.id === sheet.professor)?.nome ??
             t.professores[0] ??
             "—"
-          : "—";
+          : escalaPorTurma.get(t.id)?.professorNome ?? "—";
 
       return {
         turmaId: t.id,
@@ -175,7 +229,7 @@ export default function LicaoDetalhe() {
         sheet,
       };
     });
-  }, [lessonId, turmasBase, sheets]);
+  }, [lessonId, turmasBase, sheets, escalaPorTurma]);
 
   const primeiraTurmaPendente = turmasComChamada.find((t) => t.status === "nao_iniciada");
 
@@ -225,17 +279,19 @@ export default function LicaoDetalhe() {
   const professoresNaLicao = useMemo(() => {
     const vistos = new Set<string>();
     return turmasComChamada.flatMap((t) => {
-      if (!t.sheet || t.professorNome === "—" || vistos.has(t.professorNome)) return [];
-      vistos.add(t.professorNome);
+      const nome = t.professorNome;
+      if (nome === "—" || vistos.has(`${nome}-${t.turmaId}`)) return [];
+      vistos.add(`${nome}-${t.turmaId}`);
       return [
         {
-          nome: t.professorNome,
+          nome,
           turma: t.turmaNome,
           registrado: Boolean(t.sheet),
+          escalado: Boolean(escalaPorTurma.get(t.turmaId)?.professorId),
         },
       ];
     });
-  }, [turmasComChamada]);
+  }, [turmasComChamada, escalaPorTurma]);
 
   if (loadingLicao) {
     return <p className="text-sm text-muted-foreground">Carregando lição...</p>;
@@ -385,6 +441,76 @@ export default function LicaoDetalhe() {
         </Card>
       </div>
 
+      {podeEscalarProfessores && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="h-4 w-4" />
+              Escala de professores
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Defina quem ministra esta lição em cada turma. O professor verá a aula no painel dele.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {turmas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma turma cadastrada.</p>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {turmas.map((turma) => (
+                    <div
+                      key={turma.id}
+                      className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-medium">{turma.nome}</p>
+                        <p className="text-xs text-muted-foreground">{turma.faixaEtaria}</p>
+                      </div>
+                      <Select
+                        value={escalaForm[turma.id] || "__none"}
+                        onValueChange={(value) =>
+                          setEscalaForm((prev) => ({
+                            ...prev,
+                            [turma.id]: value === "__none" ? "" : value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full sm:w-56 touch-target">
+                          <SelectValue placeholder="Selecione o professor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">Sem professor</SelectItem>
+                          {turma.professorUsers.length === 0 ? (
+                            <SelectItem value="__empty" disabled>
+                              Nenhum professor vinculado à turma
+                            </SelectItem>
+                          ) : (
+                            turma.professorUsers.map((professor) => (
+                              <SelectItem key={professor.id} value={String(professor.id)}>
+                                {professor.nome}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => saveEscalaMutation.mutate()}
+                    disabled={saveEscalaMutation.isPending || !lessonId}
+                  >
+                    {saveEscalaMutation.isPending ? "Salvando..." : "Salvar escala"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Registro por turma</CardTitle>
@@ -397,6 +523,7 @@ export default function LicaoDetalhe() {
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="p-2">Turma</th>
+                <th className="p-2">Professor</th>
                 <th className="p-2">Status</th>
                 <th className="p-2 text-center">Presentes</th>
                 <th className="p-2 text-center">Bíblias</th>
@@ -417,6 +544,7 @@ export default function LicaoDetalhe() {
                     }
                   >
                     <td className="p-2 font-medium">{t.turmaNome}</td>
+                    <td className="p-2 text-muted-foreground">{t.professorNome}</td>
                     <td className="p-2">
                       <Badge variant={statusBadgeVariant(t.status)}>
                         {chamadaStatusLabel[t.status]}
@@ -439,19 +567,24 @@ export default function LicaoDetalhe() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Professores nas chamadas</CardTitle>
+          <CardTitle className="text-base">Professores escalados / nas chamadas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {professoresNaLicao.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum professor registrado nas fichas.</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhum professor escalado ou registrado nas fichas.
+            </p>
           ) : (
             professoresNaLicao.map((p) => (
               <div key={`${p.nome}-${p.turma}`} className="flex items-center gap-2 text-sm">
                 <CheckCircle
-                  className={`h-4 w-4 ${p.registrado ? "text-success" : "text-muted-foreground"}`}
+                  className={`h-4 w-4 ${p.registrado ? "text-success" : p.escalado ? "text-primary" : "text-muted-foreground"}`}
                 />
                 <span>
                   {p.nome} <span className="text-muted-foreground">({p.turma})</span>
+                  {!p.registrado && p.escalado ? (
+                    <span className="ml-1 text-xs text-muted-foreground">· escalado</span>
+                  ) : null}
                 </span>
               </div>
             ))

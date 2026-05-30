@@ -6,6 +6,20 @@ export function groupOrganizations(organizations: OrganizacaoContexto[]) {
   return { campos, igrejas };
 }
 
+/** Igrejas filhas de um campo específico. */
+export function igrejasDoCampo(organizations: OrganizacaoContexto[], campoId: number) {
+  return organizations.filter(
+    (org) => isTipoIgreja(org.tipo) && org.parentId === campoId,
+  );
+}
+
+/** Instâncias de topo: campos e igrejas individuais (sem pai). */
+export function instanciasTopLevel(organizations: OrganizacaoContexto[]) {
+  const { campos, igrejas } = groupOrganizations(organizations);
+  const igrejasIndividuais = igrejas.filter((igreja) => igreja.parentId == null);
+  return [...campos, ...igrejasIndividuais];
+}
+
 /** Igrejas filhas dos campos em que o usuário atua como secretário de campo. */
 export function igrejasDoSecretarioCampo(organizations: OrganizacaoContexto[]) {
   const { campos, igrejas } = groupOrganizations(organizations);

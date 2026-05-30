@@ -9,12 +9,15 @@ import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
+import { isSomenteProfessor } from "@/lib/chamada";
 import { createTurma, fetchTurmas } from "@/lib/portalApi";
 
 export default function Turmas() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { activeOrgId, podeCarregarOperacional } = usePermissions();
+  const { activeOrgId, podeCarregarOperacional, can, isAdminSistema, hasRole } = usePermissions();
+  const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
+  const podeCriarTurma = can("turmas", "criar") && !somenteProfessor;
   const { data: turmas = [], isLoading } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "turmas"),
     queryFn: fetchTurmas,
@@ -40,12 +43,23 @@ export default function Turmas() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-end">
-        <Button className="touch-target w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Turma
-        </Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">{somenteProfessor ? "Minhas turmas" : "Turmas"}</h1>
+        {podeCriarTurma ? (
+          <Button className="touch-target w-full sm:w-auto" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Turma
+          </Button>
+        ) : null}
       </div>
+
+      {turmas.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {somenteProfessor
+            ? "Nenhuma turma vinculada ao seu perfil. Peça ao secretário para associá-lo a uma turma."
+            : "Nenhuma turma cadastrada."}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {turmas.map((t) => (

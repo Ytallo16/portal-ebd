@@ -1,17 +1,15 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowUpDown,
-  BookMarked,
   BookOpen,
   CalendarDays,
   ClipboardList,
-  DollarSign,
   TrendingUp,
   UserCheck,
   UserMinus,
-  UserPlus,
   Users,
 } from "lucide-react";
 import {
@@ -25,6 +23,7 @@ import {
 } from "recharts";
 
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
+import { ApiError } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,18 +35,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, formatDate, getIniciais } from "@/lib/formatters";
-import { fetchProfessorDashboard, type ProfessorDashboard } from "@/lib/portalApi";
+import { formatDate, getIniciais } from "@/lib/formatters";
+import { licoesTurmaPath } from "@/lib/licoesRoutes";
+import { fetchProfessorDashboard } from "@/lib/portalApi";
 
 export default function DashboardProfessor() {
+  const navigate = useNavigate();
   const { activeOrgId, podeCarregarOperacional } = usePermissions();
   const [turmaSelecionadaId, setTurmaSelecionadaId] = useState<number | undefined>();
   const [mostrarPresentes, setMostrarPresentes] = useState(true);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-professor", turmaSelecionadaId),
     queryFn: () => fetchProfessorDashboard(turmaSelecionadaId),
     enabled: podeCarregarOperacional,
+    retry: false,
   });
 
   const evolucaoChart = useMemo(
@@ -74,8 +76,23 @@ export default function DashboardProfessor() {
       .slice(0, 5);
   }, [data, mostrarPresentes]);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <p className="text-sm text-muted-foreground">Carregando sua turma...</p>;
+  }
+
+  const semTurmaVinculada =
+    isError && error instanceof ApiError && (error.status === 404 || error.status === 403);
+
+  if (semTurmaVinculada || !data) {
+    return (
+      <div className="space-y-3 animate-fade-in">
+        <h1 className="text-2xl font-bold">Minha turma</h1>
+        <p className="text-sm text-muted-foreground">
+          Nenhuma turma vinculada ao seu perfil. Peça ao secretário para associá-lo a uma turma em
+          Turmas → detalhes da turma → Professores.
+        </p>
+      </div>
+    );
   }
 
   const kpis = [
@@ -177,14 +194,52 @@ export default function DashboardProfessor() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <ClipboardList className="h-4 w-4" />
-              Último registro
+              Aulas escaladas
+              {data.trimestre ? (
+                <span className="text-xs font-normal text-muted-foreground">
+                  · {data.trimestre.titulo}
+                </span>
+              ) : null}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {!data.ultimoRegistro ? (
-              <p className="text-sm text-muted-foreground">Ainda não há registro neste trimestre.</p>
+            {data.aulasEscaladas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma aula pra você nesse trimestre.
+              </p>
             ) : (
-              <UltimoRegistroResumo registro={data.ultimoRegistro} />
+              <div className="space-y-2">
+                {data.aulasEscaladas.map((aula) => (
+                  <button
+                    key={aula.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+                    onClick={() => {
+                      if (!data.trimestre) return;
+                      navigate(
+                        licoesTurmaPath(
+                          data.trimestre.ano,
+                          data.trimestre.numero,
+                          aula.numero,
+                          String(data.turma.id),
+                        ),
+                      );
+                    }}
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        Lição {aula.numero}: {aula.tema}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDate(aula.data)}</p>
+                    </div>
+                    <Badge variant={aula.registrada ? "default" : "outline"}>
+                      {aula.registrada
+                        ? `${aula.presentes + aula.ausentes > 0 ? `${aula.presentes} presentes` : "Registrada"}`
+                        : "Pendente"}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -321,76 +376,6 @@ export default function DashboardProfessor() {
             )}
           </CardContent>
         </Card>
-      </div>
-    </div>
-  );
-}
-
-function UltimoRegistroResumo({
-  registro,
-}: {
-  registro: NonNullable<ProfessorDashboard["ultimoRegistro"]>;
-}) {
-  const totalChamada = registro.presentes + registro.ausentes;
-  const pctPresenca =
-    totalChamada > 0 ? Math.round((registro.presentes / totalChamada) * 100) : 0;
-
-  const metricas = [
-    { label: "Presentes", value: registro.presentes, icon: UserCheck, accent: "text-primary" },
-    { label: "Ausentes", value: registro.ausentes, icon: UserMinus, accent: "text-muted-foreground" },
-    { label: "Visitantes", value: registro.visitantes, icon: UserPlus, accent: "text-secondary" },
-    { label: "Bíblias", value: registro.biblias, icon: BookOpen, accent: "text-primary" },
-    { label: "Revistas", value: registro.revistas, icon: BookMarked, accent: "text-primary" },
-    {
-      label: "Oferta",
-      value: formatCurrency(registro.ofertaValor),
-      icon: DollarSign,
-      accent: "text-success",
-    },
-  ];
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border bg-muted/40 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <Badge variant="secondary" className="text-[11px] font-medium">
-              Lição {registro.licaoNumero}
-            </Badge>
-            <p className="font-semibold leading-snug">{registro.licaoTema}</p>
-          </div>
-          <p className="shrink-0 text-xs text-muted-foreground">{formatDate(registro.data)}</p>
-        </div>
-
-        {totalChamada > 0 && (
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Presença na EBD</span>
-              <span className="font-semibold text-primary">{pctPresenca}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-background/80">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${pctPresenca}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {metricas.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-lg border border-border/60 bg-background/50 p-3"
-          >
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <item.icon className={`h-3.5 w-3.5 ${item.accent}`} />
-              <span className="text-[11px] text-muted-foreground">{item.label}</span>
-            </div>
-            <p className="text-base font-semibold tabular-nums leading-none">{item.value}</p>
-          </div>
-        ))}
       </div>
     </div>
   );

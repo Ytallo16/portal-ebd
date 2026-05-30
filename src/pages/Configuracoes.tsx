@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, ChevronRight, ShieldCheck, Building2 } from "lucide-react";
+import { Users, ChevronRight, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { usePermissions } from "@/auth/usePermissions";
@@ -21,23 +21,7 @@ export default function Configuracoes() {
               <Users className="h-6 w-6 text-primary" />
               <div className="min-w-0">
                 <p className="font-semibold">Usuários</p>
-                <p className="text-sm text-muted-foreground">Gerenciar usuários e permissões</p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-          onClick={() => navigate("/configuracoes/perfis-permissoes")}
-        >
-          <CardContent className="p-5 sm:p-6 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="h-6 w-6 text-primary" />
-              <div className="min-w-0">
-                <p className="font-semibold">Perfis e permissões</p>
-                <p className="text-sm text-muted-foreground">Controle por perfil e por usuário</p>
+                <p className="text-sm text-muted-foreground">Gerenciar usuários do sistema</p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -54,7 +38,9 @@ export default function Configuracoes() {
                 <Building2 className="h-6 w-6 text-primary" />
                 <div className="min-w-0">
                   <p className="font-semibold">Organizações</p>
-                  <p className="text-sm text-muted-foreground">Gerenciar matriz, filiais e congregações</p>
+                  <p className="text-sm text-muted-foreground">
+                    Gerenciar instâncias do portal (campos e igrejas individuais)
+                  </p>
                 </div>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />

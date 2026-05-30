@@ -26,7 +26,6 @@ import Financeiro from "@/pages/Financeiro";
 import Revistas from "@/pages/Revistas";
 import Configuracoes from "@/pages/Configuracoes";
 import Usuarios from "@/pages/Usuarios";
-import PerfisPermissoes from "@/pages/PerfisPermissoes";
 import Organizacoes from "@/pages/Organizacoes";
 import OrganizacaoDetalhe from "@/pages/OrganizacaoDetalhe";
 import Igrejas from "@/pages/Igrejas";
@@ -85,7 +84,6 @@ const App = () => (
                 <Route path="/igrejas" element={<Igrejas />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
                 <Route path="/configuracoes/usuarios" element={<Usuarios />} />
-                <Route path="/configuracoes/perfis-permissoes" element={<PerfisPermissoes />} />
                 <Route path="/configuracoes/organizacoes" element={<Organizacoes />} />
                 <Route path="/configuracoes/organizacoes/:id" element={<OrganizacaoDetalhe />} />
                 <Route path="/meu-perfil" element={<MeuPerfil />} />

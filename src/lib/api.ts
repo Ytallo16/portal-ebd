@@ -21,12 +21,29 @@ export class UnauthorizedError extends Error {
 
 export class ApiError extends Error {
   status: number;
+  code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
+}
+
+function parseApiErrorBody(text: string): { detail: string; code?: string } {
+  try {
+    const json = JSON.parse(text) as { detail?: string; code?: string };
+    if (json && typeof json === "object") {
+      return {
+        detail: typeof json.detail === "string" ? json.detail : text || "Erro na requisição",
+        code: json.code,
+      };
+    }
+  } catch {
+    // texto bruto
+  }
+  return { detail: text || "Erro na requisição" };
 }
 
 function url(path: string): string {
@@ -308,7 +325,11 @@ export async function request<T = unknown>(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new ApiError(text || `Erro HTTP ${response.status}`, response.status);
+    const { detail, code } = parseApiErrorBody(text);
+    if (code === "ORGANIZACAO_INATIVA") {
+      window.dispatchEvent(new Event("portal-ebd:org-inactive"));
+    }
+    throw new ApiError(detail || `Erro HTTP ${response.status}`, response.status, code);
   }
 
   if (response.status === 204) {

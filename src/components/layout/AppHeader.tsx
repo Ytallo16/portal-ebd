@@ -34,12 +34,11 @@ function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boo
   if (matchPath("/turmas", pathname)) return "Turmas";
   if (matchPath("/turmas/:id/licoes", pathname)) return "Lições da Turma";
   if (matchPath("/turmas/:id", pathname)) return "Detalhes da Turma";
-  if (matchPath("/alunos", pathname)) return "Alunos";
+  if (matchPath("/alunos", pathname)) return "Matriculados";
   if (matchPath("/financeiro", pathname)) return "Financeiro";
   if (matchPath("/revistas", pathname)) return "Revistas";
   if (matchPath("/igrejas", pathname)) return "Igrejas";
   if (matchPath("/configuracoes/usuarios", pathname)) return "Usuários";
-  if (matchPath("/configuracoes/perfis-permissoes", pathname)) return "Perfis e permissões";
   if (matchPath("/configuracoes/organizacoes/:id", pathname)) return "Detalhes da Organização";
   if (matchPath("/configuracoes/organizacoes", pathname)) return "Organizações";
   if (matchPath("/configuracoes", pathname)) return "Configurações";
@@ -62,16 +61,13 @@ function getBreadcrumbs(pathname: string, licoesOptions?: { somenteProfessor?: b
   if (matchPath("/turmas/:id/licoes", pathname)) {
     return [{ label: "Turmas", to: "/turmas" }, { label: "Detalhes da Turma", to: pathname.replace("/licoes", "") }, { label: "Lições da Turma" }];
   }
-  if (matchPath("/alunos", pathname)) return [{ label: "Alunos" }];
+  if (matchPath("/alunos", pathname)) return [{ label: "Matriculados" }];
   if (matchPath("/financeiro", pathname)) return [{ label: "Financeiro" }];
   if (matchPath("/revistas", pathname)) return [{ label: "Revistas" }];
   if (matchPath("/igrejas", pathname)) return [{ label: "Igrejas" }];
   if (matchPath("/configuracoes", pathname)) return [{ label: "Configurações" }];
   if (matchPath("/configuracoes/usuarios", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Usuários" }];
-  }
-  if (matchPath("/configuracoes/perfis-permissoes", pathname)) {
-    return [{ label: "Configurações", to: "/configuracoes" }, { label: "Perfis e permissões" }];
   }
   if (matchPath("/configuracoes/organizacoes", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Organizações" }];

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getActiveOrganizationId, hydrateOrganizationContext } from "@/lib/api";
 import {
@@ -13,6 +13,7 @@ import {
 export type PermissaoAcao = "visualizar" | "criar" | "editar" | "excluir" | "aprovar";
 
 export function usePermissions() {
+  const queryClient = useQueryClient();
   const [activeOrgId, setActiveOrgId] = useState<string | null>(() => getActiveOrganizationId());
 
   useEffect(() => {
@@ -20,9 +21,16 @@ export function usePermissions() {
       setActiveOrgId(getActiveOrganizationId());
     });
     const onOrgChanged = () => setActiveOrgId(getActiveOrganizationId());
+    const onOrgInactive = () => {
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
+    };
     window.addEventListener("portal-ebd:org-changed", onOrgChanged);
-    return () => window.removeEventListener("portal-ebd:org-changed", onOrgChanged);
-  }, []);
+    window.addEventListener("portal-ebd:org-inactive", onOrgInactive);
+    return () => {
+      window.removeEventListener("portal-ebd:org-changed", onOrgChanged);
+      window.removeEventListener("portal-ebd:org-inactive", onOrgInactive);
+    };
+  }, [queryClient]);
 
   const query = useQuery({
     queryKey: ["me", activeOrgId],
@@ -56,6 +64,8 @@ export function usePermissions() {
       podeCarregarOperacional: Boolean(
         usuario?.organizacaoAtiva && isTipoIgreja(usuario.organizacaoAtiva.tipo),
       ),
+      acessoBloqueado: Boolean(usuario?.acessoBloqueado),
+      motivoBloqueio: usuario?.motivoBloqueio ?? null,
     };
   }, [usuario]);
 

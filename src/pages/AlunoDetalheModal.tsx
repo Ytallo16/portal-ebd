@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -102,12 +112,17 @@ export function AlunoDetalheModal({
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormAluno>(() => alunoParaForm(aluno));
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const ultimoCepBuscado = useRef("");
 
   useEffect(() => {
     setForm(alunoParaForm(aluno));
     ultimoCepBuscado.current = aluno.endereco.cep.replace(/\D/g, "");
   }, [aluno]);
+
+  useEffect(() => {
+    if (!open) setConfirmDeleteOpen(false);
+  }, [open]);
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -199,6 +214,7 @@ export function AlunoDetalheModal({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-6 py-5">
@@ -465,14 +481,13 @@ export function AlunoDetalheModal({
                 <Button
                   type="button"
                   variant="destructive"
+                  size="icon"
+                  title="Excluir aluno"
                   disabled={deleteMutation.isPending || updateMutation.isPending}
-                  onClick={() => {
-                    if (window.confirm(`Excluir ${aluno.nome}?`)) {
-                      deleteMutation.mutate();
-                    }
-                  }}
+                  onClick={() => setConfirmDeleteOpen(true)}
                 >
-                  {deleteMutation.isPending ? "Excluindo..." : "Excluir aluno"}
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Excluir aluno</span>
                 </Button>
               ) : (
                 <span />
@@ -495,5 +510,27 @@ export function AlunoDetalheModal({
         </form>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir aluno?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir {aluno.nome}? Esta ação não pode ser desfeita.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={deleteMutation.isPending}
+            onClick={() => deleteMutation.mutate()}
+          >
+            {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

@@ -7,29 +7,25 @@ import {
   BookMarked,
   Church,
   Settings,
-  ChevronRight,
-  LogOut,
+  Power,
+  Building2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
 import { useAuth } from "@/auth/AuthProvider";
@@ -45,7 +41,7 @@ const items: Array<{
   { title: "Dashboard", url: "/", icon: LayoutDashboard, modulo: "dashboard" },
   { title: "Lições", url: "/licoes", icon: BookOpen, modulo: "licoes" },
   { title: "Turmas", url: "/turmas", icon: GraduationCap, modulo: "turmas" },
-  { title: "Alunos", url: "/alunos", icon: Users, modulo: "alunos" },
+  { title: "Matriculados", url: "/alunos", icon: Users, modulo: "alunos" },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign, modulo: "financeiro", hideForProfessor: true },
   { title: "Revistas", url: "/revistas", icon: BookMarked, modulo: "revistas", hideForProfessor: true },
 ];
@@ -53,13 +49,22 @@ const items: Array<{
 const configuracaoItems: Array<{
   title: string;
   url: string;
+  icon: typeof LayoutDashboard;
   modulo: ModuloPermissao;
   adminOnly?: boolean;
 }> = [
-  { title: "Usuários", url: "/configuracoes/usuarios", modulo: "usuarios" },
-  { title: "Perfis e permissões", url: "/configuracoes/perfis-permissoes", modulo: "usuarios" },
-  { title: "Organizações", url: "/configuracoes/organizacoes", modulo: "organizacoes", adminOnly: true },
+  { title: "Usuários", url: "/configuracoes/usuarios", icon: Users, modulo: "usuarios" },
+  {
+    title: "Organizações",
+    url: "/configuracoes/organizacoes",
+    icon: Building2,
+    modulo: "organizacoes",
+    adminOnly: true,
+  },
 ];
+
+const sectionLabelClass =
+  "mb-1 h-auto px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted";
 
 export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -96,26 +101,88 @@ export function AppSidebar() {
     [can, isAdminSistema],
   );
   const settingsIsActive = location.pathname.startsWith("/configuracoes");
-  const [settingsOpen, setSettingsOpen] = useState(settingsIsActive);
   const closeOnMobile = () => {
     if (isMobile) setOpenMobile(false);
   };
 
-  useEffect(() => {
-    if (settingsIsActive) {
-      setSettingsOpen(true);
-    }
-  }, [settingsIsActive]);
+  const handleLogout = async () => {
+    closeOnMobile();
+    await logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="px-3 py-2">
-        {!collapsed && (
-          <span className="text-sm font-semibold text-sidebar-foreground">Portal EBD</span>
+    <Sidebar collapsible="offcanvas" variant="floating">
+      <SidebarHeader className="gap-0 border-b border-sidebar-border/50 px-4 py-4">
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              title={usuario?.nome ?? "Usuário"}
+              onClick={() => {
+                closeOnMobile();
+                navigate("/meu-perfil");
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
+            >
+              {usuario?.iniciais ?? "--"}
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground"
+              title="Sair"
+              onClick={() => void handleLogout()}
+            >
+              <Power className="h-4 w-4" />
+              <span className="sr-only">Sair</span>
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                closeOnMobile();
+                navigate("/meu-perfil");
+              }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
+            >
+              {usuario?.iniciais ?? "--"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                closeOnMobile();
+                navigate("/meu-perfil");
+              }}
+              className="min-w-0 flex-1 text-left transition-opacity hover:opacity-80"
+            >
+              <p className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
+                {usuario?.nome ?? "Usuário"}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-sidebar-muted">
+                {organizacaoAtiva?.nome ?? usuario?.papel ?? "sem contexto"}
+              </p>
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground"
+              title="Sair"
+              onClick={() => void handleLogout()}
+            >
+              <Power className="h-4 w-4" />
+              <span className="sr-only">Sair</span>
+            </Button>
+          </div>
         )}
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
+      <SidebarContent className="gap-4 px-3 py-4">
+        <SidebarGroup className="p-0">
+          {!collapsed && <SidebarGroupLabel className={sectionLabelClass}>Menu</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
@@ -128,131 +195,55 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url}
                         end={item.url === "/"}
-                        className="hover:bg-sidebar-accent/50"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                         onClick={closeOnMobile}
                       >
-                        <item.icon className="mr-2 h-4 w-4" />
+                        <item.icon />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-              {configItems.length > 0 && (
-                collapsed ? (
+        {configItems.length > 0 && (
+          <SidebarGroup className="p-0">
+            {!collapsed && (
+              <SidebarGroupLabel className={sectionLabelClass}>Configurações</SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {collapsed ? (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={settingsIsActive} tooltip="Configurações">
-                      <NavLink
-                        to="/configuracoes"
-                        className="hover:bg-sidebar-accent/50"
-                        activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                        onClick={closeOnMobile}
-                      >
-                        <Settings className="mr-2 h-4 w-4" />
+                      <NavLink to={configItems[0]?.url ?? "/configuracoes/usuarios"} onClick={closeOnMobile}>
+                        <Settings />
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ) : (
-                  <SidebarMenuItem>
-                    <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton isActive={settingsIsActive}>
-                          <Settings className="mr-2 h-4 w-4" />
-                          <span className="flex-1">Configurações</span>
-                          <ChevronRight
-                            className={cn("h-4 w-4 transition-transform", settingsOpen && "rotate-90")}
-                          />
+                  configItems.map((item) => {
+                    const isConfigActive =
+                      location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild isActive={isConfigActive}>
+                          <NavLink to={item.url} onClick={closeOnMobile}>
+                            <item.icon />
+                            <span>{item.title}</span>
+                          </NavLink>
                         </SidebarMenuButton>
-                      </CollapsibleTrigger>
-
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {configItems.map((item) => {
-                            const isSubItemActive = location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
-                            return (
-                              <SidebarMenuSubItem key={item.title}>
-                                <SidebarMenuSubButton asChild isActive={isSubItemActive}>
-                                  <NavLink
-                                    to={item.url}
-                                    className="hover:bg-sidebar-accent/50"
-                                    activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                                    onClick={closeOnMobile}
-                                  >
-                                    <span>{item.title}</span>
-                                  </NavLink>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </SidebarMenuItem>
-                )
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border px-2 py-2">
-        {collapsed ? (
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Sair"
-                onClick={async () => {
-                  await logout();
-                  navigate("/login", { replace: true });
-                }}
-              >
-                <LogOut className="h-4 w-4" />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        ) : (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => {
-                closeOnMobile();
-                navigate("/meu-perfil");
-              }}
-              className="w-full rounded-md p-2 text-left transition-colors hover:bg-sidebar-accent/50"
-            >
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
-                  {usuario?.iniciais ?? "--"}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-sidebar-foreground">
-                    {usuario?.nome ?? "Usuário"}
-                  </p>
-                  <p className="truncate text-xs text-sidebar-muted">
-                    {organizacaoAtiva?.nome ?? usuario?.papel ?? "sem contexto"}
-                  </p>
-                </div>
-              </div>
-            </button>
-
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={async () => {
-                    closeOnMobile();
-                    await logout();
-                    navigate("/login", { replace: true });
-                  }}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sair</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
+                      </SidebarMenuItem>
+                    );
+                  })
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
-      </SidebarFooter>
+      </SidebarContent>
     </Sidebar>
   );
 }

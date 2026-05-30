@@ -53,7 +53,7 @@ describe("portalApi integration mapping", () => {
         nome: "Adultos I",
         faixaEtaria: "26-35",
         professores: ["José Ferreira"],
-        professorUsers: [{ id: 5, nome: "José Ferreira" }],
+        professorUsers: [{ id: 5, nome: "José Ferreira", linkId: "1" }],
         totalAlunos: 20,
         cor: "#125A94",
       },

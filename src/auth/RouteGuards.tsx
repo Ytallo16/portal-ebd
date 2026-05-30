@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/auth/AuthProvider";
 import { buildPermissionHelpers } from "@/auth/usePermissions";
+import { OrganizationAccessBlocked } from "@/components/layout/OrganizationAccessBlocked";
 import { podeGerenciarTrimestres } from "@/lib/chamada";
 import { fetchUsuarioLogado, type ModuloPermissao } from "@/lib/portalApi";
 import { getActiveOrganizationId, UnauthorizedError } from "@/lib/api";
@@ -25,7 +26,6 @@ const routeModules: Array<{
   { prefix: "/revistas", modulo: "revistas" },
   { prefix: "/igrejas", modulo: "organizacoes" },
   { prefix: "/configuracoes/usuarios", modulo: "usuarios" },
-  { prefix: "/configuracoes/perfis-permissoes", modulo: "usuarios" },
   { prefix: "/configuracoes/organizacoes", modulo: "organizacoes", adminOnly: true },
   { prefix: "/configuracoes", modulo: "usuarios" },
 ];
@@ -66,6 +66,10 @@ export function ProtectedRoute() {
 
   if (isError && error instanceof UnauthorizedError) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (usuarioLogado?.acessoBloqueado && !usuarioLogado.isAdminSistema) {
+    return <OrganizationAccessBlocked motivo={usuarioLogado.motivoBloqueio} />;
   }
 
   const { can, isAdminSistema, hasRole } = buildPermissionHelpers(usuarioLogado);

@@ -1,52 +1,199 @@
-import { useMemo } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Building2, Landmark, LogIn, Users } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Building2, Landmark, Users } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { organizacoesIniciais } from "@/pages/organizacoesData";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { switchOrganizationContext } from "@/lib/api";
+import {
+  activateInstanciaOrganizacao,
+  deactivateInstanciaOrganizacao,
+  fetchInstanciaOrganizacao,
+  fetchIgrejasDaInstancia,
+  isTipoCampo,
+  updateInstanciaOrganizacao,
+} from "@/lib/portalApi";
 
 export default function OrganizacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmToggle, setConfirmToggle] = useState(false);
+  const [form, setForm] = useState({
+    nome: "",
+    sigla: "",
+    cidade: "",
+    uf: "",
+    responsavel: "",
+    membros: "0",
+  });
 
-  const organizacao = useMemo(
-    () => organizacoesIniciais.find((item) => item.id === id),
-    [id],
-  );
+  const { data: instancia, isLoading } = useQuery({
+    queryKey: ["instancia-organizacao", id],
+    queryFn: () => fetchInstanciaOrganizacao(id!),
+    enabled: Boolean(id),
+  });
 
-  const igrejasVinculadas = useMemo(() => {
-    if (!organizacao) return [];
-    if (organizacao.tipo === "Sede") {
-      return organizacoesIniciais.filter((item) => item.parentId === organizacao.id);
-    }
-    return organizacoesIniciais.filter((item) => item.id === organizacao.id);
-  }, [organizacao]);
+  const isCampo = Boolean(instancia && isTipoCampo(instancia.tipo));
 
-  if (!organizacao) {
-    return <p className="text-sm text-muted-foreground">Organização não encontrada.</p>;
+  const { data: igrejas = [] } = useQuery({
+    queryKey: ["instancia-igrejas", id],
+    queryFn: () => fetchIgrejasDaInstancia(id!, true),
+    enabled: Boolean(id && isCampo),
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["instancia-organizacao", id] });
+    queryClient.invalidateQueries({ queryKey: ["instancias-organizacao"] });
+    queryClient.invalidateQueries({ queryKey: ["me"] });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      updateInstanciaOrganizacao(id!, {
+        nome: form.nome.trim(),
+        sigla: form.sigla.trim(),
+        cidade: form.cidade.trim(),
+        uf: form.uf.trim().toUpperCase(),
+        responsavel: form.responsavel.trim(),
+        membros: Number(form.membros) || 0,
+      }),
+    onSuccess: () => {
+      toast.success("Instância atualizada.");
+      setEditOpen(false);
+      invalidate();
+    },
+    onError: () => toast.error("Não foi possível salvar."),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: () =>
+      instancia!.isActive
+        ? deactivateInstanciaOrganizacao(instancia!.id)
+        : activateInstanciaOrganizacao(instancia!.id),
+    onSuccess: () => {
+      setConfirmToggle(false);
+      invalidate();
+      toast.success("Status atualizado.");
+    },
+    onError: () => toast.error("Não foi possível alterar o status."),
+  });
+
+  const acessarMutation = useMutation({
+    mutationFn: () => switchOrganizationContext(instancia!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      queryClient.invalidateQueries();
+      toast.success("Contexto alterado.");
+      navigate("/");
+    },
+    onError: () => toast.error("Não foi possível acessar a instância."),
+  });
+
+  function openEdit() {
+    if (!instancia) return;
+    setForm({
+      nome: instancia.nome,
+      sigla: instancia.sigla,
+      cidade: instancia.cidade,
+      uf: instancia.uf,
+      responsavel: instancia.responsavel,
+      membros: String(instancia.membros),
+    });
+    setEditOpen(true);
+  }
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Carregando instância...</p>;
+  }
+
+  if (!instancia) {
+    return <p className="text-sm text-muted-foreground">Instância não encontrada.</p>;
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Button variant="ghost" size="icon" className="touch-target" onClick={() => navigate("/configuracoes/organizacoes")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold break-words">{organizacao.nome}</h1>
-          <p className="text-sm text-muted-foreground">{organizacao.sigla} · {organizacao.cidade}/{organizacao.uf}</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="touch-target"
+            onClick={() => navigate("/configuracoes/organizacoes")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold break-words">{instancia.nome}</h1>
+            <p className="text-sm text-muted-foreground">
+              {instancia.sigla} · {instancia.cidade}/{instancia.uf}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={openEdit}>
+            Editar
+          </Button>
+          <Button
+            variant={instancia.isActive ? "destructive" : "default"}
+            onClick={() => setConfirmToggle(true)}
+          >
+            {instancia.isActive ? "Desativar" : "Ativar"}
+          </Button>
+          <Button
+            disabled={!instancia.isActive || acessarMutation.isPending}
+            onClick={() => acessarMutation.mutate()}
+          >
+            <LogIn className="mr-2 h-4 w-4" />
+            Acessar instância
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            {organizacao.tipo === "Sede" ? <Landmark className="h-5 w-5 text-primary" /> : <Building2 className="h-5 w-5 text-primary" />}
+            {isCampo ? (
+              <Landmark className="h-5 w-5 text-primary" />
+            ) : (
+              <Building2 className="h-5 w-5 text-primary" />
+            )}
             <div>
-              <p className="text-xl font-bold">{organizacao.tipo}</p>
-              <p className="text-xs text-muted-foreground">Tipo da organização</p>
+              <p className="text-xl font-bold">
+                {isCampo ? "Campo" : "Igreja individual"}
+              </p>
+              <p className="text-xs text-muted-foreground">Tipo da instância</p>
             </div>
           </CardContent>
         </Card>
@@ -54,7 +201,7 @@ export default function OrganizacaoDetalhe() {
           <CardContent className="flex items-center gap-3 p-4">
             <Users className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-xl font-bold">{organizacao.membros}</p>
+              <p className="text-xl font-bold">{instancia.membros}</p>
               <p className="text-xs text-muted-foreground">Membros</p>
             </div>
           </CardContent>
@@ -62,8 +209,8 @@ export default function OrganizacaoDetalhe() {
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Status</p>
-            <Badge className="mt-1" variant={organizacao.status === "Ativa" ? "default" : "secondary"}>
-              {organizacao.status}
+            <Badge className="mt-1" variant={instancia.isActive ? "default" : "secondary"}>
+              {instancia.status}
             </Badge>
           </CardContent>
         </Card>
@@ -71,54 +218,130 @@ export default function OrganizacaoDetalhe() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Informações da Organização</CardTitle>
+          <CardTitle className="text-base">Informações</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <p><span className="text-muted-foreground">Nome:</span> {organizacao.nome}</p>
-          <p><span className="text-muted-foreground">Sigla:</span> {organizacao.sigla}</p>
-          <p><span className="text-muted-foreground">Tipo:</span> {organizacao.tipo}</p>
-          <p><span className="text-muted-foreground">Cidade/UF:</span> {organizacao.cidade}/{organizacao.uf}</p>
-          <p><span className="text-muted-foreground">Responsável:</span> {organizacao.responsavel}</p>
+          <p><span className="text-muted-foreground">Responsável:</span> {instancia.responsavel || "—"}</p>
+          <p><span className="text-muted-foreground">Formato:</span> {instancia.formato || "—"}</p>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            {organizacao.tipo === "Sede" ? "Igrejas da Organização" : "Dados da Igreja"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {igrejasVinculadas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma igreja vinculada encontrada.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Cidade</TableHead>
-                  <TableHead>Membros</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {igrejasVinculadas.map((igreja) => (
-                  <TableRow key={igreja.id}>
-                    <TableCell className="font-medium">{igreja.nome}</TableCell>
-                    <TableCell>{igreja.tipo}</TableCell>
-                    <TableCell>{igreja.cidade}/{igreja.uf}</TableCell>
-                    <TableCell>{igreja.membros}</TableCell>
-                    <TableCell>
-                      <Badge variant={igreja.status === "Ativa" ? "default" : "secondary"}>{igreja.status}</Badge>
-                    </TableCell>
+      {isCampo && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Igrejas do campo</CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            {igrejas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma igreja cadastrada neste campo.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Cidade</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {igrejas.map((igreja) => (
+                    <TableRow key={igreja.id}>
+                      <TableCell className="font-medium">{igreja.nome}</TableCell>
+                      <TableCell>{igreja.cidade}/{igreja.uf}</TableCell>
+                      <TableCell>{igreja.responsavel || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={igreja.isActive ? "default" : "secondary"}>
+                          {igreja.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar instância</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Nome</Label>
+              <Input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Sigla</Label>
+              <Input value={form.sigla} onChange={(e) => setForm((f) => ({ ...f, sigla: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Membros</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.membros}
+                onChange={(e) => setForm((f) => ({ ...f, membros: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Cidade</Label>
+              <Input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>UF</Label>
+              <Input
+                maxLength={2}
+                value={form.uf}
+                onChange={(e) => setForm((f) => ({ ...f, uf: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Responsável</Label>
+              <Input
+                value={form.responsavel}
+                onChange={(e) => setForm((f) => ({ ...f, responsavel: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmToggle} onOpenChange={setConfirmToggle}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {instancia.isActive ? "Desativar instância?" : "Ativar instância?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {instancia.isActive
+                ? "Usuários vinculados perderão o acesso ao portal até a reativação."
+                : "Usuários vinculados voltarão a acessar o portal."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={toggleMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={instancia.isActive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
+              disabled={toggleMutation.isPending}
+              onClick={() => toggleMutation.mutate()}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
