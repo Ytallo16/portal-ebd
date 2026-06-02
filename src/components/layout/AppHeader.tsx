@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { Moon, Sun, Bell, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/UserAvatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -139,11 +139,12 @@ export function AppHeader() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="touch-target flex items-center gap-2 px-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                {usuarioLogado?.iniciais ?? "--"}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              nome={usuarioLogado?.nome ?? "Usuário"}
+              fotoUrl={usuarioLogado?.fotoUrl}
+              className="h-8 w-8"
+              fallbackClassName="text-xs"
+            />
             <span className="hidden text-sm font-medium md:inline">{usuarioLogado?.nome.split(" ")[0] ?? "Usuário"}</span>
           </Button>
         </DropdownMenuTrigger>

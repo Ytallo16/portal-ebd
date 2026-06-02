@@ -32,20 +32,41 @@ import {
 import { formatPapelLabel } from "@/lib/roleLabels";
 import { getIniciais } from "@/lib/formatters";
 
-function getCreateRoleOptions(isAdminSistema: boolean, contextoCampo: boolean, contextoIgreja: boolean) {
-  const options: string[] = [];
-  if (isAdminSistema) options.push("ADMINISTRADOR");
-  if (contextoCampo) options.push("SECRETARIO_CAMPO");
-  if (contextoIgreja) {
-    options.push("SECRETARIO_IGREJA", "PROFESSOR");
+function getCreateRoleOptions(isAdminSistema: boolean, hasRole: (...roles: string[]) => boolean) {
+  if (isAdminSistema) {
+    return ["ADMINISTRADOR", "SECRETARIO_CAMPO", "SECRETARIO_IGREJA", "PROFESSOR"];
   }
-  return options;
+  if (hasRole("SECRETARIO_CAMPO")) {
+    return ["SECRETARIO_CAMPO", "SECRETARIO_IGREJA", "PROFESSOR"];
+  }
+  if (hasRole("SECRETARIO_IGREJA")) {
+    return ["SECRETARIO_IGREJA", "PROFESSOR"];
+  }
+  return [];
 }
 
-function defaultPapelParaCriacao(options: string[]) {
-  if (options.includes("PROFESSOR")) return "PROFESSOR";
-  if (options.includes("SECRETARIO_IGREJA")) return "SECRETARIO_IGREJA";
-  return options[0] ?? "";
+function papeisAplicaveisNoContexto(
+  options: string[],
+  contextoCampo: boolean,
+  contextoIgreja: boolean,
+) {
+  return options.filter((papel) => {
+    if (papel === "ADMINISTRADOR") return true;
+    if (papel === "SECRETARIO_CAMPO") return contextoCampo;
+    if (papel === "SECRETARIO_IGREJA" || papel === "PROFESSOR") return contextoIgreja;
+    return false;
+  });
+}
+
+function defaultPapelParaCriacao(
+  options: string[],
+  contextoCampo: boolean,
+  contextoIgreja: boolean,
+) {
+  const aplicaveis = papeisAplicaveisNoContexto(options, contextoCampo, contextoIgreja);
+  if (aplicaveis.includes("PROFESSOR")) return "PROFESSOR";
+  if (aplicaveis.includes("SECRETARIO_IGREJA")) return "SECRETARIO_IGREJA";
+  return aplicaveis[0] ?? "";
 }
 
 export default function Usuarios() {
@@ -66,12 +87,17 @@ export default function Usuarios() {
   });
 
   const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
-  const { isAdminSistema, can, contextoCampo, contextoIgreja, organizacaoAtiva } = usePermissions();
+  const { isAdminSistema, can, hasRole, contextoCampo, contextoIgreja, organizacaoAtiva } = usePermissions();
   const podeCriarUsuario = can("usuarios", "criar");
 
   const papeisDisponiveis = useMemo(
-    () => getCreateRoleOptions(isAdminSistema, contextoCampo, contextoIgreja),
-    [isAdminSistema, contextoCampo, contextoIgreja],
+    () => getCreateRoleOptions(isAdminSistema, hasRole),
+    [isAdminSistema, hasRole],
+  );
+
+  const papeisNoContextoAtual = useMemo(
+    () => papeisAplicaveisNoContexto(papeisDisponiveis, contextoCampo, contextoIgreja),
+    [papeisDisponiveis, contextoCampo, contextoIgreja],
   );
 
   const toggleMutation = useMutation({
@@ -118,7 +144,7 @@ export default function Usuarios() {
       nome: "",
       email: "",
       senha: "123456",
-      papel: defaultPapelParaCriacao(papeisDisponiveis),
+      papel: defaultPapelParaCriacao(papeisDisponiveis, contextoCampo, contextoIgreja),
       isActive: true,
     });
     setIsCreateOpen(true);
@@ -167,10 +193,10 @@ export default function Usuarios() {
   const inativos = usuarios.filter((u) => u.status === "Inativo").length;
 
   const precisaIgrejaParaPerfil =
+    podeCriarUsuario &&
     contextoCampo &&
     !contextoIgreja &&
-    podeCriarUsuario &&
-    papeisDisponiveis.every((p) => p === "ADMINISTRADOR" || p === "SECRETARIO_CAMPO");
+    papeisDisponiveis.some((p) => p === "SECRETARIO_IGREJA" || p === "PROFESSOR");
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Carregando usuários...</p>;
@@ -313,7 +339,7 @@ export default function Usuarios() {
                   <SelectValue placeholder="Selecione o perfil" />
                 </SelectTrigger>
                 <SelectContent>
-                  {papeisDisponiveis.map((papel) => (
+                  {papeisNoContextoAtual.map((papel) => (
                     <SelectItem key={papel} value={papel}>
                       {formatPapelLabel(papel)}
                     </SelectItem>

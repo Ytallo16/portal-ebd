@@ -289,6 +289,7 @@ export type OrganizacaoContexto = {
 export type UsuarioLogado = {
   nome: string;
   email: string;
+  fotoUrl: string | null;
   papel: string;
   papeis: string[];
   status: "Ativo" | "Inativo";
@@ -1173,6 +1174,7 @@ export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
   return {
     nome: me.nome,
     email: me.email,
+    fotoUrl: me.foto_url ?? null,
     papel: formatPapelLabel(papelPrincipal),
     papeis,
     status: me.is_active ? "Ativo" : "Inativo",
@@ -1193,6 +1195,43 @@ export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
     acessoBloqueado: Boolean(me.acesso_bloqueado),
     motivoBloqueio: me.motivo_bloqueio ?? null,
   };
+}
+
+export async function updateMeuPerfil(payload: { nome: string }) {
+  return request("/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  }, { ensureOrganization: false });
+}
+
+export async function changeMinhaSenha(payload: {
+  senhaAtual: string;
+  novaSenha: string;
+  confirmarSenha: string;
+}) {
+  return request("/me/change-password", {
+    method: "POST",
+    body: JSON.stringify({
+      senha_atual: payload.senhaAtual,
+      nova_senha: payload.novaSenha,
+      confirmar_senha: payload.confirmarSenha,
+    }),
+  }, { ensureOrganization: false });
+}
+
+export async function uploadFotoPerfil(file: File) {
+  const formData = new FormData();
+  formData.append("foto", file);
+  return request("/me/avatar", {
+    method: "PATCH",
+    body: formData,
+  }, { ensureOrganization: false });
+}
+
+export async function removeFotoPerfil() {
+  return request("/me/avatar", {
+    method: "DELETE",
+  }, { ensureOrganization: false });
 }
 
 export async function fetchDashboardSummary() {

@@ -27,6 +27,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { usePermissions } from "@/auth/usePermissions";
+import { UserAvatar } from "@/components/UserAvatar";
 import { isSomenteProfessor } from "@/lib/chamada";
 import { useAuth } from "@/auth/AuthProvider";
 import { deveExibirMenuIgrejas, type ModuloPermissao } from "@/lib/portalApi";
@@ -127,9 +128,14 @@ export function AppSidebar() {
               closeOnMobile();
               navigate("/meu-perfil");
             }}
-            className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
+            className="mx-auto overflow-hidden rounded-xl ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
           >
-            {usuario?.iniciais ?? "--"}
+            <UserAvatar
+              nome={usuario?.nome ?? "Usuário"}
+              fotoUrl={usuario?.fotoUrl}
+              className="h-10 w-10 rounded-xl"
+              fallbackClassName="rounded-xl bg-sidebar-primary text-sidebar-primary-foreground text-xs"
+            />
           </button>
         ) : (
           <div className="flex items-center gap-3">
@@ -139,9 +145,14 @@ export function AppSidebar() {
                 closeOnMobile();
                 navigate("/meu-perfil");
               }}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sm font-bold text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
+              className="shrink-0 overflow-hidden rounded-xl ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
             >
-              {usuario?.iniciais ?? "--"}
+              <UserAvatar
+                nome={usuario?.nome ?? "Usuário"}
+                fotoUrl={usuario?.fotoUrl}
+                className="h-11 w-11 rounded-xl"
+                fallbackClassName="rounded-xl bg-sidebar-primary text-sidebar-primary-foreground text-sm"
+              />
             </button>
             <button
               type="button"
