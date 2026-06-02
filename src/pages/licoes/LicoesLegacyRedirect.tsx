@@ -1,6 +1,7 @@
 import { Navigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
+import { RedirectSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import {
   licoesDestinoAoAbrirLicao,
@@ -25,7 +26,7 @@ export function LicoesLicaoIdRedirect() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Redirecionando...</p>;
+    return <RedirectSkeleton />;
   }
 
   if (licao && !isError) {
@@ -58,7 +59,7 @@ export function LicoesClasseLegacyRedirect() {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Redirecionando...</p>;
+    return <RedirectSkeleton />;
   }
 
   if (licao && classId) {

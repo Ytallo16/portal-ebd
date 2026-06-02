@@ -6,6 +6,7 @@ import { FinanceFiltroField, FinanceFiltrosToolbar } from "@/components/financei
 import { FinanceIgrejaKpis } from "@/components/financeiro/FinanceIgrejaKpis";
 import { FinanceLancamentosSection } from "@/components/financeiro/FinanceLancamentosSection";
 import { FinanceTurmasBreakdown } from "@/components/financeiro/FinanceTurmasBreakdown";
+import { FinanceiroSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import {
   fetchFinanceResumo,
@@ -86,7 +87,7 @@ export function FinanceiroIgreja() {
   }, [data?.summary.destaque.valor, data?.summary.total]);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando financeiro...</p>;
+    return <FinanceiroSkeleton />;
   }
 
   if (!data) {

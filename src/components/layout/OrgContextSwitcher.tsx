@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2 } from "lucide-react";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/auth/usePermissions";
 import {
   Select,
@@ -61,7 +62,7 @@ function SelectIgrejas({
         className={cn(
           "h-8 text-xs",
           variant === "header"
-            ? "w-[min(100%,14rem)] border-input bg-background sm:w-56"
+            ? "w-full max-w-full border-input bg-background"
             : "w-full border-sidebar-border bg-sidebar-accent/30",
         )}
       >
@@ -115,7 +116,7 @@ export function OrgContextSwitcher({ variant = "card", igrejaOnly = false }: Org
     deveExibirSeletorIgrejasNoHeader(organizacaoAtiva);
 
   if (isLoading) {
-    return null;
+    return <Skeleton className={cn("h-9", variant === "header" ? "w-36 sm:w-44" : "w-full")} />;
   }
 
   // Contrato de igreja única: sem seletor
@@ -223,7 +224,7 @@ export function OrgContextSwitcher({ variant = "card", igrejaOnly = false }: Org
         className={cn(
           "h-8 text-xs",
           variant === "header"
-            ? "w-[min(100%,14rem)] border-input bg-background sm:w-56"
+            ? "w-full max-w-full border-input bg-background"
             : "w-full border-sidebar-border bg-sidebar-accent/30",
         )}
       >

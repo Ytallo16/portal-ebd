@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight } from "lucide-react";
+import { LicoesTrimestreSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { fetchTurmas, fetchLicoesByTurma } from "@/lib/portalApi";
 import { formatDate } from "@/lib/formatters";
@@ -44,7 +45,7 @@ export default function TurmaLicoes() {
     : [];
 
   if (loadingTurmas || loadingLicoes) {
-    return <p className="text-sm text-muted-foreground">Carregando dados da turma...</p>;
+    return <LicoesTrimestreSkeleton />;
   }
 
   if (!turma) return <p>Turma não encontrada.</p>;

@@ -5,6 +5,7 @@ import { FinanceBarChart, FinanceEvolutionChart, FinanceKpiGrid } from "@/compon
 import { FINANCE_PANEL_PAGE_SIZE } from "@/components/financeiro/financePanelLayout";
 import { FinanceLancamentosSection } from "@/components/financeiro/FinanceLancamentosSection";
 import { FinanceRankingIgrejas } from "@/components/financeiro/FinanceRankingIgrejas";
+import { FinanceiroSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { fetchFinanceResumo } from "@/lib/portalApi";
 import { formatCurrency } from "@/lib/formatters";
@@ -28,7 +29,7 @@ export function FinanceiroCampo() {
   );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando financeiro...</p>;
+    return <FinanceiroSkeleton campo />;
   }
 
   if (!data) {

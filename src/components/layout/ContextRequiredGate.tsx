@@ -1,5 +1,6 @@
 import { useLocation } from "react-router-dom";
 
+import { PageContentSkeleton } from "@/components/skeletons";
 import { usePermissions } from "@/auth/usePermissions";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { isOperationalPath } from "@/lib/orgContext";
@@ -12,7 +13,7 @@ export function ContextRequiredGate({ children }: { children: React.ReactNode })
   const secretarioCampo = isSecretarioCampoUsuario(usuario?.papeis ?? [], isAdminSistema);
 
   if (isLoading) {
-    return <p className="p-4 text-sm text-muted-foreground">Carregando contexto...</p>;
+    return <PageContentSkeleton withKpis={false} />;
   }
 
   const contextoIgreja = Boolean(organizacaoAtiva && isTipoIgreja(organizacaoAtiva.tipo));

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PersonGridCard, personListGridClassName } from "@/components/lists/PersonGridCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { KeyRound, Pencil, Plus, Search, Users, UserCheck, UserX } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -29,8 +29,8 @@ import {
   updateUsuario,
   type Usuario,
 } from "@/lib/portalApi";
+import { UsuariosPageSkeleton } from "@/components/skeletons";
 import { formatPapelLabel } from "@/lib/roleLabels";
-import { getIniciais } from "@/lib/formatters";
 
 function getCreateRoleOptions(isAdminSistema: boolean, hasRole: (...roles: string[]) => boolean) {
   if (isAdminSistema) {
@@ -199,7 +199,7 @@ export default function Usuarios() {
     papeisDisponiveis.some((p) => p === "SECRETARIO_IGREJA" || p === "PROFESSOR");
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando usuários...</p>;
+    return <UsuariosPageSkeleton />;
   }
 
   return (
@@ -247,48 +247,65 @@ export default function Usuarios() {
         </Card>
       </div>
 
-      <div className="space-y-3">
+      <div className={personListGridClassName()}>
         {filtered.map((u) => (
-          <Card key={u.id}>
-              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
-                    {getIniciais(u.nome)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{u.nome}</p>
-                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+          <PersonGridCard
+            key={u.id}
+            nome={u.nome}
+            subtitle={u.email}
+            badges={
+              <>
+                <Badge variant="outline" className="text-xs">
+                  {formatPapelLabel(u.papel) || u.papel}
+                </Badge>
+                <Badge variant={u.status === "Ativo" ? "default" : "secondary"} className="text-xs">
+                  {u.status}
+                </Badge>
+              </>
+            }
+            footer={
+              <>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <Switch
+                    checked={u.status === "Ativo"}
+                    onCheckedChange={() => toggleMutation.mutate(u.id)}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {u.status === "Ativo" ? "Ativo" : "Inativo"}
+                  </span>
+                </label>
+                <div className="flex items-center gap-1">
+                  {isAdminSistema && can("usuarios", "editar") ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="touch-target h-9 w-9"
+                      onClick={() => {
+                        setResettingUser(u);
+                        setIsResetConfirmOpen(true);
+                      }}
+                      title="Resetar senha para 123456"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      <span className="sr-only">Resetar senha para 123456</span>
+                    </Button>
+                  ) : null}
+                  {can("usuarios", "editar") ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="touch-target h-9 w-9"
+                      onClick={() => openEditModal(u)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Editar usuário</span>
+                    </Button>
+                  ) : null}
                 </div>
-                <Badge variant="secondary" className="shrink-0">{u.papel}</Badge>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Switch checked={u.status === "Ativo"} onCheckedChange={() => toggleMutation.mutate(u.id)} />
-                  <span className="text-xs text-muted-foreground hidden sm:inline">{u.status}</span>
-                </div>
-                {isAdminSistema && can("usuarios", "editar") ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="touch-target shrink-0"
-                    onClick={() => {
-                      setResettingUser(u);
-                      setIsResetConfirmOpen(true);
-                    }}
-                    title="Resetar senha para 123456"
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    <span className="sr-only">Resetar senha para 123456</span>
-                  </Button>
-                ) : null}
-                {can("usuarios", "editar") ? (
-                  <Button variant="ghost" size="icon" className="touch-target shrink-0" onClick={() => openEditModal(u)}>
-                    <Pencil className="h-4 w-4" />
-                    <span className="sr-only">Editar usuário</span>
-                  </Button>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
+              </>
+            }
+          />
+        ))}
       </div>
 
       <Dialog

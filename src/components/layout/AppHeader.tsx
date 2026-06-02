@@ -32,14 +32,14 @@ function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boo
 
   if (matchPath("/", pathname)) return "Dashboard";
   if (matchPath("/turmas", pathname)) return "Turmas";
-  if (matchPath("/turmas/:id/licoes", pathname)) return "Lições da Turma";
-  if (matchPath("/turmas/:id", pathname)) return "Detalhes da Turma";
+  if (matchPath("/turmas/:id/licoes", pathname)) return "Lições";
+  if (matchPath("/turmas/:id", pathname)) return "Turma";
   if (matchPath("/alunos", pathname)) return "Matriculados";
   if (matchPath("/financeiro", pathname)) return "Financeiro";
   if (matchPath("/revistas", pathname)) return "Revistas";
   if (matchPath("/igrejas", pathname)) return "Igrejas";
   if (matchPath("/configuracoes/usuarios", pathname)) return "Usuários";
-  if (matchPath("/configuracoes/organizacoes/:id", pathname)) return "Detalhes da Organização";
+  if (matchPath("/configuracoes/organizacoes/:id", pathname)) return "Organização";
   if (matchPath("/configuracoes/organizacoes", pathname)) return "Organizações";
   if (matchPath("/configuracoes", pathname)) return "Configurações";
   if (matchPath("/meu-perfil", pathname)) return "Meu Perfil";
@@ -56,10 +56,14 @@ function getBreadcrumbs(pathname: string, licoesOptions?: { somenteProfessor?: b
   if (matchPath("/", pathname)) return [{ label: "Dashboard" }];
   if (matchPath("/turmas", pathname)) return [{ label: "Turmas" }];
   if (matchPath("/turmas/:id", pathname)) {
-    return [{ label: "Turmas", to: "/turmas" }, { label: "Detalhes da Turma" }];
+    return [{ label: "Turmas", to: "/turmas" }, { label: "Turma" }];
   }
   if (matchPath("/turmas/:id/licoes", pathname)) {
-    return [{ label: "Turmas", to: "/turmas" }, { label: "Detalhes da Turma", to: pathname.replace("/licoes", "") }, { label: "Lições da Turma" }];
+    return [
+      { label: "Turmas", to: "/turmas" },
+      { label: "Turma", to: pathname.replace("/licoes", "") },
+      { label: "Lições" },
+    ];
   }
   if (matchPath("/alunos", pathname)) return [{ label: "Matriculados" }];
   if (matchPath("/financeiro", pathname)) return [{ label: "Financeiro" }];
@@ -73,7 +77,11 @@ function getBreadcrumbs(pathname: string, licoesOptions?: { somenteProfessor?: b
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Organizações" }];
   }
   if (matchPath("/configuracoes/organizacoes/:id", pathname)) {
-    return [{ label: "Configurações", to: "/configuracoes" }, { label: "Organizações", to: "/configuracoes/organizacoes" }, { label: "Detalhes da Organização" }];
+    return [
+      { label: "Configurações", to: "/configuracoes" },
+      { label: "Organizações", to: "/configuracoes/organizacoes" },
+      { label: "Organização" },
+    ];
   }
   if (matchPath("/meu-perfil", pathname)) return [{ label: "Meu Perfil" }];
   return [{ label: "Portal EBD" }];
@@ -92,7 +100,7 @@ export function AppHeader() {
   const breadcrumbs = getBreadcrumbs(location.pathname, licoesNavOptions);
 
   return (
-    <header className="safe-area-top z-30 flex min-h-14 shrink-0 items-center gap-2 border-b bg-card px-3 py-2 md:px-4 md:py-0">
+    <header className="safe-area-top z-30 flex h-14 shrink-0 items-center gap-1 border-b bg-card px-2 sm:gap-1.5 sm:px-3 md:gap-2 md:px-4">
       <Button
         variant="ghost"
         size="icon"
@@ -102,8 +110,13 @@ export function AppHeader() {
         <PanelLeft className="h-4 w-4" />
       </Button>
 
-      <div className="min-w-0 flex-1 md:flex-none">
-        <h1 className="text-base font-semibold md:hidden">{pageTitle}</h1>
+      <div className="min-w-0 flex-1 overflow-hidden md:flex-none md:overflow-visible">
+        <h1
+          className="truncate text-sm font-semibold leading-tight md:hidden"
+          title={pageTitle}
+        >
+          {pageTitle}
+        </h1>
         <Breadcrumb className="hidden md:block">
           <BreadcrumbList>
             {breadcrumbs.map((crumb, index) => (
@@ -124,19 +137,20 @@ export function AppHeader() {
         </Breadcrumb>
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center justify-end px-1 sm:px-2">
-        <OrgContextSwitcher variant="header" />
-      </div>
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+        <div className="min-w-0 max-w-[min(32vw,7rem)] shrink sm:max-w-[9rem] md:max-w-[11rem]">
+          <OrgContextSwitcher variant="header" />
+        </div>
 
-      <Button variant="ghost" size="icon" className="touch-target" onClick={toggleTheme}>
-        {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-      </Button>
+        <Button variant="ghost" size="icon" className="touch-target shrink-0" onClick={toggleTheme}>
+          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
 
-      <NotificationBell />
+        <NotificationBell />
 
-      <DropdownMenu>
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="touch-target h-auto max-w-[180px] gap-2 px-2 py-1.5 lg:max-w-[220px]">
+          <Button variant="ghost" className="touch-target h-auto shrink-0 gap-2 px-1.5 py-1.5 sm:px-2">
             <UserAvatar
               nome={usuarioLogado?.nome ?? "Usuário"}
               fotoUrl={usuarioLogado?.fotoUrl}
@@ -161,6 +175,7 @@ export function AppHeader() {
           <DropdownMenuItem onClick={() => navigate("/meu-perfil")}>Meu Perfil</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   );
 }

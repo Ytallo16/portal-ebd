@@ -18,6 +18,7 @@ import {
   validarFaixaEtaria,
 } from "@/lib/faixaEtaria";
 import { createTurma, fetchTurmas } from "@/lib/portalApi";
+import { CardGridSkeleton, PageHeaderSkeleton } from "@/components/skeletons";
 import { toast } from "sonner";
 
 export default function Turmas() {
@@ -68,7 +69,12 @@ export default function Turmas() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando turmas...</p>;
+    return (
+      <div className="space-y-6 animate-pulse">
+        <PageHeaderSkeleton action={podeCriarTurma} />
+        <CardGridSkeleton />
+      </div>
+    );
   }
 
   return (

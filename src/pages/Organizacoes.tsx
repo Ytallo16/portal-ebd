@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { CardGridSkeleton, PageHeaderSkeleton } from "@/components/skeletons";
 import { switchOrganizationContext } from "@/lib/api";
 import {
   activateInstanciaOrganizacao,
@@ -191,7 +192,12 @@ export default function Organizacoes() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando instâncias...</p>;
+    return (
+      <div className="space-y-6 animate-pulse">
+        <PageHeaderSkeleton action />
+        <CardGridSkeleton />
+      </div>
+    );
   }
 
   return (

@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, GraduationCap, Users } from "lucide-react";
 
+import { TurmaDetalheSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlunoTurmaCard } from "@/components/lists/AlunoTurmaCard";
 import { MobileTableWrap } from "@/components/ui/mobile-table-wrap";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAlunos, fetchTurmas } from "@/lib/portalApi";
@@ -49,7 +51,7 @@ export default function TurmaDetalhe() {
   );
 
   if (loadingTurmas || loadingAlunos) {
-    return <p className="text-sm text-muted-foreground">Carregando dados da turma...</p>;
+    return <TurmaDetalheSkeleton />;
   }
 
   if (!turma) {
@@ -156,32 +158,43 @@ export default function TurmaDetalhe() {
           {alunosDaTurma.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum aluno cadastrado nesta turma.</p>
           ) : (
-            <MobileTableWrap minWidthClass="min-w-[36rem]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Sexo</TableHead>
-                  <TableHead>Nascimento</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>E-mail</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <div className="space-y-3 md:hidden">
                 {alunosDaTurma.map((aluno) => (
-                  <TableRow key={aluno.id}>
-                    <TableCell className="font-medium">{aluno.nome}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{aluno.sexo === "M" ? "Masculino" : "Feminino"}</Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(aluno.dataNascimento)}</TableCell>
-                    <TableCell>{aluno.telefone || "Sem telefone"}</TableCell>
-                    <TableCell>{aluno.email || "Sem e-mail"}</TableCell>
-                  </TableRow>
+                  <AlunoTurmaCard key={aluno.id} aluno={aluno} />
                 ))}
-              </TableBody>
-            </Table>
-            </MobileTableWrap>
+              </div>
+              <div className="hidden md:block">
+                <MobileTableWrap minWidthClass="min-w-[36rem]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Sexo</TableHead>
+                        <TableHead>Nascimento</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead>E-mail</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {alunosDaTurma.map((aluno) => (
+                        <TableRow key={aluno.id}>
+                          <TableCell className="font-medium">{aluno.nome}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {aluno.sexo === "M" ? "Masculino" : "Feminino"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(aluno.dataNascimento)}</TableCell>
+                          <TableCell>{aluno.telefone || "Sem telefone"}</TableCell>
+                          <TableCell>{aluno.email || "Sem e-mail"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </MobileTableWrap>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

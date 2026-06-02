@@ -77,19 +77,19 @@ export function getLicoesPageTitle(
 ): string | null {
   const somenteProfessor = Boolean(options?.somenteProfessor);
   if (matchPath("/licoes/gerenciar-trimestres", pathname)) {
-    return "Gerenciar trimestres";
+    return "Trimestres";
   }
   if (matchPath("/licoes/:ano/:trimestre/:licaoNumero/turmas/:classId", pathname)) {
-    return somenteProfessor ? "Registro da EBD" : "Chamada da turma";
+    return somenteProfessor ? "Registro" : "Chamada";
   }
   if (matchPath("/licoes/:ano/:trimestre/:licaoNumero/frequencia-professores", pathname)) {
-    return "Frequência dos professores";
+    return "Professores";
   }
   if (matchPath("/licoes/:ano/:trimestre/:licaoNumero", pathname)) {
-    return somenteProfessor ? "Registro da EBD" : "Detalhes da lição";
+    return somenteProfessor ? "Registro" : "Lição";
   }
   if (matchPath("/licoes/:ano/:trimestre", pathname)) {
-    return "Lições do trimestre";
+    return "Trimestre";
   }
   if (pathname === "/licoes" || pathname === "/licoes/") {
     return "Lições";

@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import { FrequenciaProfessoresSkeleton, RedirectSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +45,7 @@ export default function FrequenciaProfessoresLicao() {
   }
 
   if (somenteProfessor && loadingUsuario) {
-    return <p className="text-sm text-muted-foreground">Carregando...</p>;
+    return <RedirectSkeleton />;
   }
 
   if (somenteProfessor) {
@@ -172,7 +173,7 @@ export default function FrequenciaProfessoresLicao() {
   }, [professores]);
 
   if (loadingLicao) {
-    return <p className="text-sm text-muted-foreground">Carregando lição...</p>;
+    return <FrequenciaProfessoresSkeleton />;
   }
 
   if (!licao) {

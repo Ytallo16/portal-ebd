@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
+import { LicoesTrimestreSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,7 @@ export default function LicoesTrimestre() {
   );
 
   if (loadingMeta || loadingLicoes) {
-    return <p className="text-sm text-muted-foreground">Carregando lições...</p>;
+    return <LicoesTrimestreSkeleton />;
   }
 
   return (

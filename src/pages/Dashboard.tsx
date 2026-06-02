@@ -6,6 +6,7 @@ import { BirthdayDateBadge } from "@/components/dashboard/BirthdayDateBadge";
 import { BirthdayColumns } from "@/components/dashboard/BirthdayColumns";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
+import { DashboardSkeleton } from "@/components/skeletons";
 import DashboardProfessor from "@/pages/DashboardProfessor";
 import {
   fetchDashboardAttendanceEvolution,
@@ -35,26 +36,33 @@ export default function Dashboard() {
 function DashboardIgreja() {
   const { activeOrgId } = usePermissions();
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: loadingSummary } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-summary"),
     queryFn: fetchDashboardSummary,
   });
-  const { data: attendanceEvolution = [] } = useQuery({
+  const { data: attendanceEvolution = [], isLoading: loadingAttendance } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-attendance"),
     queryFn: fetchDashboardAttendanceEvolution,
   });
-  const { data: classComposition = [] } = useQuery({
+  const { data: classComposition = [], isLoading: loadingComposition } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-composition"),
     queryFn: fetchDashboardClassComposition,
   });
-  const { data: offeringEvolution = [] } = useQuery({
+  const { data: offeringEvolution = [], isLoading: loadingOffering } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-offering"),
     queryFn: fetchDashboardOfferingEvolution,
   });
-  const { data: birthdays = [] } = useQuery({
+  const { data: birthdays = [], isLoading: loadingBirthdays } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-birthdays"),
     queryFn: fetchDashboardBirthdays,
   });
+
+  const isPageLoading =
+    loadingSummary || loadingAttendance || loadingComposition || loadingOffering || loadingBirthdays;
+
+  if (isPageLoading && summary === undefined) {
+    return <DashboardSkeleton />;
+  }
 
   const hoje = new Date();
   const dataFormatada = hoje.toLocaleDateString("pt-BR", {

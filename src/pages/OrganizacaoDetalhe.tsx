@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { OrganizacaoDetalheSkeleton } from "@/components/skeletons";
 import { MobileTableWrap } from "@/components/ui/mobile-table-wrap";
 import {
   Dialog,
@@ -134,7 +135,7 @@ export default function OrganizacaoDetalhe() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando instância...</p>;
+    return <OrganizacaoDetalheSkeleton />;
   }
 
   if (!instancia) {

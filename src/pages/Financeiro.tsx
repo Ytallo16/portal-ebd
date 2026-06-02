@@ -1,5 +1,6 @@
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePermissions } from "@/auth/usePermissions";
+import { FinanceiroSkeleton } from "@/components/skeletons";
 import { FinanceiroCampo } from "@/pages/financeiro/FinanceiroCampo";
 import { FinanceiroIgreja } from "@/pages/financeiro/FinanceiroIgreja";
 
@@ -7,7 +8,7 @@ export default function Financeiro() {
   const { contextoCampo, contextoIgreja, podeVisualizarFinanceiro, isLoading } = usePermissions();
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando financeiro...</p>;
+    return <FinanceiroSkeleton />;
   }
 
   if (!podeVisualizarFinanceiro) {

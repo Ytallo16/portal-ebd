@@ -5,10 +5,10 @@ import {
   BookMarked,
   Cake,
   ClipboardList,
-  Loader2,
   CalendarClock,
 } from "lucide-react";
 
+import { NotificationListSkeleton } from "@/components/skeletons";
 import { useNotifications } from "@/hooks/useNotifications";
 import { usePermissions } from "@/auth/usePermissions";
 import type { NotificationKind, PortalNotification } from "@/lib/portalApi";
@@ -144,9 +144,7 @@ export function NotificationBell() {
         </div>
         <div className="max-h-[min(60vh,320px)] overflow-y-auto p-1">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
+            <NotificationListSkeleton />
           ) : isError ? (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
               Não foi possível carregar as notificações.

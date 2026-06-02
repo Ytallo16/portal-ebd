@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { CalendarRange, ChevronRight, Settings2, Sparkles } from "lucide-react";
 
+import { LicoesHubSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor, podeGerenciarTrimestres } from "@/lib/chamada";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +84,7 @@ export default function LicoesHub() {
   }, [trimestres]);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando trimestres...</p>;
+    return <LicoesHubSkeleton />;
   }
 
   return (

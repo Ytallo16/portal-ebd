@@ -13,6 +13,13 @@ import {
   XCircle,
 } from "lucide-react";
 
+import {
+  CardGridSkeleton,
+  ListRowSkeleton,
+  RevistasSkeleton,
+  SearchBarSkeleton,
+} from "@/components/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,11 +182,11 @@ export default function Revistas() {
   }, [controleTurma]);
 
   if (loadingTurmas || (passo !== "turma" && loadingTrimestres)) {
-    return <p className="text-sm text-muted-foreground">Carregando revistas...</p>;
+    return <RevistasSkeleton />;
   }
 
   const renderResumoCards = (resumo: ReturnType<typeof resumoRevistas>) => (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
       {[
         { label: "Total", value: resumo.total, icon: Users },
         { label: "Entregues", value: resumo.entregues, icon: Package },
@@ -392,7 +399,7 @@ export default function Revistas() {
         </div>
 
         {loadingControleTurma ? (
-          <p className="text-sm text-muted-foreground">Carregando trimestres...</p>
+          <CardGridSkeleton count={3} cols="grid-cols-1 sm:grid-cols-2" />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {trimestresOrdenados.map((t) => {
@@ -472,7 +479,20 @@ export default function Revistas() {
       </div>
 
       {loadingRevistas ? (
-        <p className="text-sm text-muted-foreground">Carregando checklist...</p>
+        <div className="space-y-4 animate-pulse">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-3">
+                  <Skeleton className="h-6 w-10" />
+                  <Skeleton className="mt-2 h-3 w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <SearchBarSkeleton />
+          <ListRowSkeleton count={10} />
+        </div>
       ) : semControles ? (
         <Card>
           <CardContent className="flex flex-col items-start gap-4 p-6">

@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PerfilSkeleton } from "@/components/skeletons";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ApiError } from "@/lib/api";
 import {
@@ -49,23 +50,6 @@ function validateAvatarFile(file: File): string | null {
     return "A imagem deve ter no máximo 5 MB.";
   }
   return null;
-}
-
-function PerfilSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-2xl animate-pulse space-y-6 px-2 sm:px-0">
-      <div className="h-8 w-40 rounded-md bg-muted" />
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <div className="h-28 bg-muted" />
-        <div className="flex flex-col items-center gap-4 px-6 pb-8 pt-0">
-          <div className="-mt-12 h-28 w-28 rounded-full bg-muted ring-4 ring-background" />
-          <div className="h-6 w-48 rounded bg-muted" />
-          <div className="h-4 w-56 rounded bg-muted" />
-        </div>
-      </div>
-      <div className="h-64 rounded-xl border bg-card" />
-    </div>
-  );
 }
 
 export default function MeuPerfil() {

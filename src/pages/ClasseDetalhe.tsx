@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, BookOpen, BookMarked, DollarSign, Loader2, Users, UserPlus } from "lucide-react";
 
 import { ApiError } from "@/lib/api";
+import { ClasseDetalheSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import type { Turma } from "@/lib/portalApi";
 import { Badge } from "@/components/ui/badge";
@@ -244,7 +245,7 @@ export default function ClasseDetalhe() {
   const pct = Math.round((presentes / Math.max(alunosDaTurma.length, 1)) * 100);
 
   if (carregandoContexto) {
-    return <p className="text-sm text-muted-foreground">Carregando registro da turma...</p>;
+    return <ClasseDetalheSkeleton />;
   }
 
   if (isProfessor && !podeEditarFrequencia) {
@@ -378,7 +379,7 @@ export default function ClasseDetalhe() {
   }
 
   if (loadingSheet || (!sheet && !sheetFetched)) {
-    return <p className="text-sm text-muted-foreground">Carregando registro da turma...</p>;
+    return <ClasseDetalheSkeleton />;
   }
 
   return (
@@ -396,7 +397,7 @@ export default function ClasseDetalhe() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 sm:gap-4">
         <StatCard icon={Users} label="Presentes" value={presentes} />
         <StatCard icon={UserPlus} label="Ausentes" value={ausentes} />
         <StatCard icon={UserPlus} label="Visitantes" value={visitantes} />
@@ -567,9 +568,9 @@ function StatCard({
   return (
     <Card>
       <CardContent className="flex items-center gap-2 p-4">
-        <Icon className="h-5 w-5 text-primary" />
-        <div>
-          <p className="text-xl font-bold">{value}</p>
+        <Icon className="h-5 w-5 shrink-0 text-primary" />
+        <div className="min-w-0">
+          <p className="truncate text-lg font-bold sm:text-xl">{value}</p>
           <p className="text-xs text-muted-foreground">{label}</p>
         </div>
       </CardContent>

@@ -23,6 +23,7 @@ import {
 
 import { BirthdayDateBadge } from "@/components/dashboard/BirthdayDateBadge";
 import { BirthdayColumns } from "@/components/dashboard/BirthdayColumns";
+import { DashboardProfessorSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { ApiError } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -78,7 +79,7 @@ export default function DashboardProfessor() {
   }, [data, mostrarPresentes]);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando sua turma...</p>;
+    return <DashboardProfessorSkeleton />;
   }
 
   const semTurmaVinculada =

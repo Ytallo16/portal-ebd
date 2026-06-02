@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { LicaoDetalheSkeleton, RedirectSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import {
   AlertDialog,
@@ -57,7 +58,7 @@ import {
   licoesTrimestrePath,
   licoesTurmaPath,
 } from "@/lib/licoesRoutes";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, truncateChartLabel } from "@/lib/formatters";
 import {
   BarChart,
   Bar,
@@ -204,7 +205,7 @@ export default function LicaoDetalhe() {
       return {
         turmaId: t.id,
         turmaNome: t.nome,
-        turmaLabel: t.nome.length > 10 ? `${t.nome.slice(0, 10)}…` : t.nome,
+        turmaLabel: t.nome,
         status,
         presentes,
         ausentes,
@@ -236,6 +237,14 @@ export default function LicaoDetalhe() {
     totalPresentes + totalAusentes > 0
       ? Math.round((totalPresentes / (totalPresentes + totalAusentes)) * 100)
       : 0;
+
+  const chartYAxisWidth = (() => {
+    const maxLen = chamadaPorClasse.reduce(
+      (max, item) => Math.max(max, truncateChartLabel(item.turmaLabel, 14).length),
+      0,
+    );
+    return Math.min(128, Math.max(52, maxLen * 7 + 12));
+  })();
 
   const podeFinalizarLicao =
     secretarioOuAdmin &&
@@ -280,7 +289,7 @@ export default function LicaoDetalhe() {
   }
 
   if (isProfessor && loadingUsuario) {
-    return <p className="text-sm text-muted-foreground">Carregando...</p>;
+    return <RedirectSkeleton />;
   }
 
   if (professorRegistroPath) {
@@ -302,11 +311,11 @@ export default function LicaoDetalhe() {
   }
 
   if (loadingLicao) {
-    return <p className="text-sm text-muted-foreground">Carregando lição...</p>;
+    return <LicaoDetalheSkeleton />;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="min-w-0 space-y-6 animate-fade-in">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Button
@@ -375,11 +384,11 @@ export default function LicaoDetalhe() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <div>
+            <BookOpen className="h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0">
               <p className="text-xl font-bold">{totalBiblias}</p>
               <p className="text-xs text-muted-foreground">Bíblias</p>
             </div>
@@ -387,8 +396,8 @@ export default function LicaoDetalhe() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <BookMarked className="h-5 w-5 text-secondary" />
-            <div>
+            <BookMarked className="h-5 w-5 shrink-0 text-secondary" />
+            <div className="min-w-0">
               <p className="text-xl font-bold">{totalRevistas}</p>
               <p className="text-xs text-muted-foreground">Revistas</p>
             </div>
@@ -396,31 +405,47 @@ export default function LicaoDetalhe() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <DollarSign className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-xl font-bold">{formatCurrency(totalOfertas)}</p>
+            <DollarSign className="h-5 w-5 shrink-0 text-success" />
+            <div className="min-w-0">
+              <p className="truncate text-lg font-bold sm:text-xl" title={formatCurrency(totalOfertas)}>
+                {formatCurrency(totalOfertas)}
+              </p>
               <p className="text-xs text-muted-foreground">Ofertas</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Frequência por turma</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-w-0">
             {chamadaPorClasse.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma chamada registrada ainda.</p>
             ) : (
-              <div className="chart-container h-[220px] sm:h-[250px]">
+              <div className="chart-container h-[220px] w-full min-w-0 sm:h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chamadaPorClasse} layout="vertical">
+                <BarChart
+                  data={chamadaPorClasse}
+                  layout="vertical"
+                  margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="turmaLabel" tick={{ fontSize: 11 }} width={80} />
-                  <Tooltip />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="turmaLabel"
+                    tick={{ fontSize: 10 }}
+                    width={chartYAxisWidth}
+                    tickFormatter={(value) => truncateChartLabel(String(value), 14)}
+                  />
+                  <Tooltip
+                    labelFormatter={(_, payload) =>
+                      payload?.[0]?.payload?.turmaNome ?? payload?.[0]?.payload?.turmaLabel ?? ""
+                    }
+                  />
                   <Bar dataKey="presentes" fill="hsl(142,71%,45%)" radius={[0, 4, 4, 0]} />
                   <Bar dataKey="ausentes" fill="hsl(0,72%,51%)" radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -456,7 +481,7 @@ export default function LicaoDetalhe() {
                 <span className="text-xs text-muted-foreground">Presença</span>
               </div>
             </div>
-            <div className="mt-4 flex gap-6 text-sm">
+            <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
               <span className="font-medium text-success">{totalPresentes} presentes</span>
               <span className="font-medium text-destructive">{totalAusentes} ausentes</span>
             </div>

@@ -26,6 +26,7 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { OrgContextSwitcher } from "@/components/layout/OrgContextSwitcher";
 import { usePermissions } from "@/auth/usePermissions";
 import { UserAvatar } from "@/components/UserAvatar";
 import { isSomenteProfessor } from "@/lib/chamada";
@@ -171,6 +172,14 @@ export function AppSidebar() {
             </button>
           </div>
         )}
+        {isMobile && !collapsed ? (
+          <div className="mt-3 w-full border-t border-sidebar-border/50 pt-3">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted">
+              Contexto
+            </p>
+            <OrgContextSwitcher variant="card" />
+          </div>
+        ) : null}
       </SidebarHeader>
       <SidebarContent className="gap-4 px-3 py-4">
         <SidebarGroup className="p-0">

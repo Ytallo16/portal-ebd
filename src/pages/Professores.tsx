@@ -4,6 +4,8 @@ import { ArrowRightLeft, GraduationCap, Medal, Search, TrendingUp, UserRoundChec
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 
+import { PersonGridCard, personListGridClassName } from "@/components/lists/PersonGridCard";
+import { ListRowSkeleton, ProfessoresPageSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { ApiError } from "@/lib/api";
 import { isSomenteProfessor } from "@/lib/chamada";
@@ -14,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchTrimestres, fetchTurmas, rankingApi, teachersApi } from "@/lib/portalApi";
+import { cn } from "@/lib/utils";
 
 function getAnoAtual() {
   return new Date().getFullYear();
@@ -144,7 +147,7 @@ export default function Professores() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando professores...</p>;
+    return <ProfessoresPageSkeleton />;
   }
 
   return (
@@ -258,59 +261,72 @@ export default function Professores() {
           </div>
 
           {loadingRanking ? (
-            <p className="text-sm text-muted-foreground">Carregando ranking...</p>
+            <ListRowSkeleton count={5} />
           ) : ranking.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Não há dados de frequência de professores para este filtro.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {ranking.map((item, index) => (
-                <div
-                  key={`${item.professorId}-${index}`}
-                  className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <p className="font-medium">
-                      {index + 1}º {item.professorNome}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Turmas: {item.turmaNomes.join(", ") || "Sem turma"}
-                    </p>
-                  </div>
-                  <div className="text-sm">
-                    <span className="font-semibold">{item.presencaPct.toFixed(1)}%</span>
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {item.presencas} presenças · {item.ausencias} ausências
-                    </span>
-                  </div>
-                </div>
+                <Card key={`${item.professorId}-${index}`} className="overflow-hidden">
+                  <CardContent className="flex items-start gap-3 p-4">
+                    <div
+                      className={cn(
+                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                        index === 0
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {index + 1}º
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold leading-tight">{item.professorNome}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.turmaNomes.join(", ") || "Sem turma"}
+                      </p>
+                      <p className="mt-2 text-lg font-bold text-primary">
+                        {item.presencaPct.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.presencas} presenças · {item.ausencias} ausências
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
+      <div className={personListGridClassName()}>
         {filtrados.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum professor encontrado.</p>
+          <p className="text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">
+            Nenhum professor encontrado.
+          </p>
         ) : (
           filtrados.map((item) => (
-            <Card key={item.id}>
-              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <p className="font-medium">{item.nome}</p>
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant="default" className="text-xs">Professor</Badge>
-                    <Badge variant="outline" className="text-xs">{item.turmaNome || "Sem turma"}</Badge>
-                  </div>
-                </div>
-                {podeEditarProfessores ? (
+            <PersonGridCard
+              key={item.id}
+              nome={item.nome}
+              fallbackClassName="bg-secondary text-secondary-foreground"
+              badges={
+                <>
+                  <Badge className="text-xs">Professor</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {item.turmaNome || "Sem turma"}
+                  </Badge>
+                </>
+              }
+              footer={
+                podeEditarProfessores ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="w-full touch-target sm:w-auto"
                     onClick={() => {
                       setTransferirTarget({
                         professorId: item.professorId,
@@ -322,11 +338,11 @@ export default function Professores() {
                     }}
                   >
                     <ArrowRightLeft className="mr-2 h-4 w-4" />
-                    Transferir
+                    Transferir de turma
                   </Button>
-                ) : null}
-              </CardContent>
-            </Card>
+                ) : null
+              }
+            />
           ))
         )}
       </div>

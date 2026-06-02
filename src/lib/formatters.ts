@@ -54,3 +54,10 @@ export function formatarCep(value: string): string {
   if (digits.length <= 5) return digits;
   return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
+
+/** Rótulos longos em gráficos (eixo Y/categoria) sem estourar o card no mobile. */
+export function truncateChartLabel(label: string, max = 14): string {
+  const text = String(label);
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+}

@@ -6,6 +6,7 @@ import {
   FINANCE_PANEL_CARD_CLASS,
   FINANCE_PANEL_PAGE_SIZE,
 } from "@/components/financeiro/financePanelLayout";
+import { TableSkeleton } from "@/components/skeletons";
 import { cn } from "@/lib/utils";
 import type { FinanceResumoPaginacao, FinanceResumoRecente } from "@/lib/portalApi";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -77,8 +78,8 @@ export function FinanceLancamentosTable({
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={colSpan} className="p-4 text-center text-muted-foreground">
-                    Carregando lançamentos...
+                  <td colSpan={colSpan} className="p-4">
+                    <TableSkeleton rows={FINANCE_PANEL_PAGE_SIZE} cols={colSpan} />
                   </td>
                 </tr>
               ) : recentes.length === 0 ? (

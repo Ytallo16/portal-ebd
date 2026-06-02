@@ -18,6 +18,7 @@ import {
   studentsApi,
 } from "@/lib/portalApi";
 import { formatarTelefone, getIniciais } from "@/lib/formatters";
+import { AlunosPageSkeleton } from "@/components/skeletons";
 import { AlunoDetalheModal } from "@/pages/AlunoDetalheModal";
 
 export default function Alunos() {
@@ -130,7 +131,7 @@ export default function Alunos() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando alunos...</p>;
+    return <AlunosPageSkeleton />;
   }
 
   async function onCreateSubmit(e: React.FormEvent) {

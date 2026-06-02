@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarRange, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { licoesTrimestrePath } from "@/lib/licoesRoutes";
+import { TrimestresPageSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { podeGerenciarTrimestres } from "@/lib/chamada";
 import { createTrimestre, deleteTrimestre, fetchTrimestres, type Trimestre, updateTrimestre } from "@/lib/portalApi";
@@ -116,7 +117,7 @@ export default function Trimestres() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando trimestres...</p>;
+    return <TrimestresPageSkeleton />;
   }
 
   return (
@@ -139,7 +140,7 @@ export default function Trimestres() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Total</p><p className="text-2xl font-bold">{estatisticas.total}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Planejados</p><p className="text-2xl font-bold">{estatisticas.planejados}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Em andamento</p><p className="text-2xl font-bold">{estatisticas.andamento}</p></CardContent></Card>

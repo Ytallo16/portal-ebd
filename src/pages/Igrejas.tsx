@@ -28,6 +28,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  CardGridSkeleton,
+  KpiGridSkeleton,
+  PageHeaderSkeleton,
+  SearchBarSkeleton,
+} from "@/components/skeletons";
 import { switchOrganizationContext } from "@/lib/api";
 import {
   activateIgreja,
@@ -181,6 +187,17 @@ export default function Igrejas() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <PageHeaderSkeleton action subtitle />
+        <SearchBarSkeleton />
+        <KpiGridSkeleton count={3} />
+        <CardGridSkeleton count={4} cols="grid-cols-1 md:grid-cols-2" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -244,10 +261,7 @@ export default function Igrejas() {
         </Card>
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Carregando igrejas...</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtradas.map((igreja) => (
             <Card key={igreja.id}>
               <CardContent className="p-4 space-y-4">
@@ -310,10 +324,9 @@ export default function Igrejas() {
               </CardContent>
             </Card>
           ))}
-        </div>
-      )}
+      </div>
 
-      {!isLoading && filtradas.length === 0 && (
+      {filtradas.length === 0 && (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           Nenhuma igreja encontrada. Cadastre a primeira igreja do campo.
         </div>

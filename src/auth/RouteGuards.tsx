@@ -6,6 +6,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { buildPermissionHelpers } from "@/auth/usePermissions";
 import { OrganizationAccessBlocked } from "@/components/layout/OrganizationAccessBlocked";
 import { podeGerenciarTrimestres } from "@/lib/chamada";
+import { AppShellSkeleton } from "@/components/skeletons";
 import { fetchUsuarioLogado, type ModuloPermissao } from "@/lib/portalApi";
 import { getActiveOrganizationId, UnauthorizedError } from "@/lib/api";
 
@@ -64,7 +65,7 @@ export function ProtectedRoute() {
   }
 
   if (isLoading) {
-    return <p className="p-4 text-sm text-muted-foreground">Carregando permissões...</p>;
+    return <AppShellSkeleton />;
   }
 
   if (isError && error instanceof UnauthorizedError) {
