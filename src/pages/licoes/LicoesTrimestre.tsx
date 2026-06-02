@@ -8,7 +8,7 @@ import { isSomenteProfessor } from "@/lib/chamada";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { licoesDestinoAoAbrirLicao, trimestreLabel } from "@/lib/licoesRoutes";
+import { licoesDestinoAoAbrirLicao, licoesLicaoPath, trimestreLabel } from "@/lib/licoesRoutes";
 import { fetchLicoes, fetchTrimestres } from "@/lib/portalApi";
 import { formatDate } from "@/lib/formatters";
 import { Navigate } from "react-router-dom";
@@ -76,15 +76,15 @@ export default function LicoesTrimestre() {
         {grade.map(({ numero, licao }) => (
           <Card
             key={numero}
-            className={`transition-all ${licao ? "cursor-pointer hover:ring-2 hover:ring-primary/50" : "opacity-75"}`}
+            className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${licao ? "" : "opacity-75"}`}
             onClick={() => {
-              if (!licao) return;
-              navigate(
-                licoesDestinoAoAbrirLicao(ano, trimestre, numero, {
-                  somenteProfessor,
-                  turmasProfessor,
-                }),
-              );
+              const destino = licao
+                ? licoesDestinoAoAbrirLicao(ano, trimestre, numero, {
+                    somenteProfessor,
+                    turmasProfessor,
+                  })
+                : licoesLicaoPath(ano, trimestre, numero);
+              navigate(destino);
             }}
           >
             <CardContent className="space-y-2 p-4">
@@ -94,7 +94,6 @@ export default function LicoesTrimestre() {
                   {licao?.status ?? "Pendente"}
                 </Badge>
               </div>
-              <p className="font-medium">{licao?.tema ?? "Lição ainda não cadastrada"}</p>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>{licao ? formatDate(licao.data) : "Sem data"}</span>
                 {licao && licao.presentes + licao.ausentes > 0 && (

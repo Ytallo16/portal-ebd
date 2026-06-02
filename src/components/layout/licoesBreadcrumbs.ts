@@ -38,6 +38,20 @@ export function getLicoesBreadcrumbs(
       ];
     }
 
+    const frequenciaProfessoresMatch = matchPath(
+      "/licoes/:ano/:trimestre/:licaoNumero/frequencia-professores",
+      pathname,
+    );
+    if (frequenciaProfessoresMatch?.params.licaoNumero) {
+      const num = Number(frequenciaProfessoresMatch.params.licaoNumero);
+      return [
+        ...base,
+        { label: triLabel, to: triPath },
+        { label: `Lição ${num}`, to: `/licoes/${ano}/${tri}/${num}` },
+        { label: "Frequência dos professores" },
+      ];
+    }
+
     const licaoMatch = matchPath("/licoes/:ano/:trimestre/:licaoNumero", pathname);
     if (licaoMatch?.params.licaoNumero) {
       return [
@@ -67,6 +81,9 @@ export function getLicoesPageTitle(
   }
   if (matchPath("/licoes/:ano/:trimestre/:licaoNumero/turmas/:classId", pathname)) {
     return somenteProfessor ? "Registro da EBD" : "Chamada da turma";
+  }
+  if (matchPath("/licoes/:ano/:trimestre/:licaoNumero/frequencia-professores", pathname)) {
+    return "Frequência dos professores";
   }
   if (matchPath("/licoes/:ano/:trimestre/:licaoNumero", pathname)) {
     return somenteProfessor ? "Registro da EBD" : "Detalhes da lição";

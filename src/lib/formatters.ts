@@ -17,6 +17,11 @@ export function formatDate(dateStr: string): string {
   return d.toLocaleDateString("pt-BR");
 }
 
+export function formatDateDayMonth(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+}
+
 export function extrairDigitosTelefone(value: string): string {
   return value.replace(/\D/g, "").slice(0, 11);
 }

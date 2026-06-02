@@ -1,18 +1,19 @@
 import { FormEvent, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("admin@adebd.com");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,54 +25,107 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       navigate(from, { replace: true });
     } catch {
-      setError("Email ou senha inválidos.");
+      setError("Email ou senha inválidos. Tente novamente.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-3 bg-gradient-to-br from-slate-50 to-sky-100 sm:p-4">
-      <Card className="w-full max-w-sm shadow-lg sm:max-w-md">
-        <CardHeader>
-          <CardTitle>Entrar no Portal EBD</CardTitle>
-          <CardDescription>Use suas credenciais para acessar o sistema.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Email</label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seuemail@exemplo.com"
-                required
-              />
-            </div>
+    <div className="relative min-h-screen bg-[#f4f6f8]">
+      {/* Textura leve */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.4]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/80 via-transparent to-white/60" />
 
-            <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Senha</label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
+      <div className="relative flex min-h-screen flex-col items-center justify-center px-5 py-12">
+        <div className="w-full max-w-[380px] animate-fade-in">
+          {/* Marca */}
+          <div className="mb-10 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-primary">
+              Portal
+            </p>
+            <h1 className="mt-2 text-4xl font-bold tracking-tight text-foreground sm:text-[2.75rem]">
+              EBD
+            </h1>
+            <div className="mx-auto mt-4 h-0.5 w-10 rounded-full bg-primary" />
+            
+          </div>
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {/* Formulário */}
+          <div className="rounded-2xl border border-border/60 bg-card p-7 shadow-[0_8px_30px_rgb(0,0,0,0.06)] sm:p-8">
+            <p className="mb-6 text-sm font-medium text-foreground">Acesse sua conta</p>
 
-            <Button className="w-full" type="submit" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nome@exemplo.com"
+                  className="h-12 border-border/80 bg-background text-base"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Senha
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Sua senha"
+                  className="h-12 border-border/80 bg-background text-base"
+                  required
+                />
+              </div>
+
+              {error ? (
+                <p className="rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive" role="alert">
+                  {error}
+                </p>
+              ) : null}
+
+              <Button
+                className="h-12 w-full text-base font-medium"
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  "Continuar"
+                )}
+              </Button>
+            </form>
+          </div>
+
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Problemas no acesso? Contate o secretário da sua igreja.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

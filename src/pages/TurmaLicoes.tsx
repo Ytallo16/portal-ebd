@@ -98,7 +98,6 @@ export default function TurmaLicoes() {
                   <Badge variant="secondary">Lição {l.numero}</Badge>
                   <Badge variant={l.status === "Finalizada" ? "default" : "outline"}>{l.status}</Badge>
                 </div>
-                <p className="font-medium text-sm">{l.tema}</p>
                 <p className="text-xs text-muted-foreground">{formatDate(l.data)}</p>
               </CardContent>
             </Card>

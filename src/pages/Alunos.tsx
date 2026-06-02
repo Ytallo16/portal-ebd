@@ -8,22 +8,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { GraduationCap, Plus, Search, UserRound, Users } from "lucide-react";
+import { Plus, Search, UserRound, Users } from "lucide-react";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
 import {
-  buildMatriculados,
   createAluno,
   fetchAlunos,
   fetchTurmas,
-  type Matriculado,
+  studentsApi,
 } from "@/lib/portalApi";
 import { formatarTelefone, getIniciais } from "@/lib/formatters";
 import { AlunoDetalheModal } from "@/pages/AlunoDetalheModal";
-
-function matriculadoTipoLabel(tipo: Matriculado["tipo"]) {
-  return tipo === "PROFESSOR" ? "Professor" : "Aluno";
-}
 
 export default function Alunos() {
   const queryClient = useQueryClient();
@@ -86,7 +81,7 @@ export default function Alunos() {
   );
 
   const matriculadosVisiveis = useMemo(() => {
-    const todos = buildMatriculados(alunos, turmas);
+    const todos = studentsApi.buildMatriculadosAlunos(alunos, turmas);
     if (!somenteProfessor) return todos;
     return todos.filter((item) => idsTurmasProfessor.has(item.turmaId));
   }, [alunos, turmas, somenteProfessor, idsTurmasProfessor]);
@@ -95,13 +90,11 @@ export default function Alunos() {
     const termo = search.toLowerCase();
     return (
       item.nome.toLowerCase().includes(termo) ||
-      item.turmaNome.toLowerCase().includes(termo) ||
-      matriculadoTipoLabel(item.tipo).toLowerCase().includes(termo)
+      item.turmaNome.toLowerCase().includes(termo)
     );
   });
 
-  const totalAlunos = matriculadosVisiveis.filter((item) => item.tipo === "ALUNO").length;
-  const totalProfessores = matriculadosVisiveis.filter((item) => item.tipo === "PROFESSOR").length;
+  const totalAlunos = matriculadosVisiveis.length;
 
   const turmaIdProfessor = useMemo(() => {
     if (!somenteProfessor || turmasProfessor.length === 0) return "";
@@ -125,8 +118,19 @@ export default function Alunos() {
   const selectedAluno =
     alunos.find((a) => a.id === selectedAlunoId) ?? null;
 
+  if (!podeCarregarOperacional) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-2xl font-bold">Alunos</h1>
+        <p className="text-sm text-muted-foreground">
+          Selecione uma igreja no contexto para visualizar e gerenciar alunos.
+        </p>
+      </div>
+    );
+  }
+
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Carregando matriculados...</p>;
+    return <p className="text-sm text-muted-foreground">Carregando alunos...</p>;
   }
 
   async function onCreateSubmit(e: React.FormEvent) {
@@ -142,11 +146,11 @@ export default function Alunos() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold">Matriculados</h1>
+        <h1 className="text-2xl font-bold">Alunos</h1>
         {podeCriarMatriculado && (
           <Button className="w-full sm:w-auto" onClick={abrirNovoMatriculado}>
             <Plus className="mr-2 h-4 w-4" />
-            Novo matriculado
+            Novo aluno
           </Button>
         )}
       </div>
@@ -156,8 +160,8 @@ export default function Alunos() {
         <Input
           placeholder={
             somenteProfessor
-              ? "Buscar matriculado..."
-              : "Buscar por nome, turma ou tipo..."
+              ? "Buscar aluno..."
+              : "Buscar por nome ou turma..."
           }
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -165,13 +169,13 @@ export default function Alunos() {
         />
       </div>
 
-      <div className={`grid grid-cols-1 gap-4 ${somenteProfessor ? "sm:grid-cols-3" : "sm:grid-cols-3"}`}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Users className="h-5 w-5 text-primary" />
             <div>
               <p className="text-xl font-bold">{matriculadosVisiveis.length}</p>
-              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-xs text-muted-foreground">Alunos visíveis</p>
             </div>
           </CardContent>
         </Card>
@@ -184,49 +188,31 @@ export default function Alunos() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <GraduationCap className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xl font-bold">{totalProfessores}</p>
-              <p className="text-xs text-muted-foreground">Professores</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">
-            Nenhum matriculado encontrado.
+            Nenhum aluno encontrado.
           </p>
         ) : (
           filtered.map((item) => (
             <Card
               key={item.id}
-              className={`transition-all ${item.tipo === "ALUNO" ? "cursor-pointer hover:ring-2 hover:ring-primary/50" : ""}`}
+              className="cursor-pointer transition-all hover:ring-2 hover:ring-primary/50"
               onClick={() => {
                 if (item.alunoId) setSelectedAlunoId(item.alunoId);
               }}
             >
               <CardContent className="flex items-center gap-3 p-4">
                 <Avatar className="h-10 w-10">
-                  <AvatarFallback
-                    className={
-                      item.tipo === "PROFESSOR"
-                        ? "bg-secondary text-secondary-foreground text-sm font-semibold"
-                        : "bg-primary text-primary-foreground text-sm font-semibold"
-                    }
-                  >
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
                     {getIniciais(item.nome)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium truncate">{item.nome}</p>
                   <div className="mt-1 flex flex-wrap gap-1">
-                    <Badge variant={item.tipo === "PROFESSOR" ? "default" : "secondary"} className="text-xs">
-                      {matriculadoTipoLabel(item.tipo)}
-                    </Badge>
                     {(!somenteProfessor || turmasProfessor.length > 1) && (
                       <Badge variant="outline" className="text-xs">
                         {item.turmaNome || turmaNameById.get(item.turmaId) || "—"}
@@ -259,7 +245,7 @@ export default function Alunos() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Novo matriculado</DialogTitle>
+            <DialogTitle>Novo aluno</DialogTitle>
             {somenteProfessor && turmaNomeProfessor && (
               <p className="text-sm text-muted-foreground">
                 O aluno será cadastrado na turma {turmaNomeProfessor}.

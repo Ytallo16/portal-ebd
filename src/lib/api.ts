@@ -1,7 +1,5 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000/api/v1";
 
-const ACCESS_KEY = "portal_ebd_access_token";
-const REFRESH_KEY = "portal_ebd_refresh_token";
 const USER_EMAIL_KEY = "portal_ebd_user_email";
 const ORG_KEY_FALLBACK = "portal_ebd_org_id";
 
@@ -31,6 +29,8 @@ export class ApiError extends Error {
   }
 }
 
+const FETCH_WITH_COOKIES: RequestCredentials = "include";
+
 function parseApiErrorBody(text: string): { detail: string; code?: string } {
   try {
     const json = JSON.parse(text) as { detail?: string; code?: string };
@@ -51,16 +51,7 @@ function url(path: string): string {
 }
 
 export function getAccessToken() {
-  return localStorage.getItem(ACCESS_KEY);
-}
-
-function getRefreshToken() {
-  return localStorage.getItem(REFRESH_KEY);
-}
-
-function setTokens(access: string, refresh: string) {
-  localStorage.setItem(ACCESS_KEY, access);
-  localStorage.setItem(REFRESH_KEY, refresh);
+  return null;
 }
 
 export function getSessionUserEmail() {
@@ -77,8 +68,6 @@ export function resetContextHydration() {
 
 export function clearSession() {
   const orgKey = orgStorageKey();
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
   localStorage.removeItem(orgKey);
   localStorage.removeItem(USER_EMAIL_KEY);
   resetContextHydration();
@@ -86,26 +75,21 @@ export function clearSession() {
 }
 
 export function isAuthenticated() {
-  return Boolean(getAccessToken());
+  return Boolean(getSessionUserEmail());
 }
 
 async function refreshToken(): Promise<boolean> {
-  const refresh = getRefreshToken();
-  if (!refresh) return false;
-
   const response = await fetch(url("/auth/refresh"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh }),
+    credentials: FETCH_WITH_COOKIES,
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
     clearSession();
     return false;
   }
-
-  const data = await response.json();
-  setTokens(data.access, data.refresh ?? refresh);
   return true;
 }
 
@@ -113,15 +97,13 @@ export async function loginWithCredentials(email: string, password: string) {
   const response = await fetch(url("/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: FETCH_WITH_COOKIES,
     body: JSON.stringify({ email, password }),
   });
 
   if (!response.ok) {
     throw new UnauthorizedError("Credenciais inválidas");
   }
-
-  const data = await response.json();
-  setTokens(data.access, data.refresh);
   setSessionUserEmail(email);
   resetContextHydration();
   const orgKey = orgStorageKey();
@@ -130,8 +112,7 @@ export async function loginWithCredentials(email: string, password: string) {
 }
 
 export async function logoutFromApi() {
-  const access = getAccessToken();
-  if (!access) {
+  if (!isAuthenticated()) {
     clearSession();
     return;
   }
@@ -139,7 +120,8 @@ export async function logoutFromApi() {
   try {
     await fetch(url("/auth/logout"), {
       method: "POST",
-      headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
+      credentials: FETCH_WITH_COOKIES,
     });
   } finally {
     clearSession();
@@ -285,8 +267,7 @@ export async function request<T = unknown>(
   init: RequestInit = {},
   options: { ensureOrganization?: boolean; skipOrganizationHeader?: boolean } = {},
 ): Promise<T> {
-  let access = getAccessToken();
-  if (!access) {
+  if (!isAuthenticated()) {
     throw new UnauthorizedError();
   }
 
@@ -300,12 +281,11 @@ export async function request<T = unknown>(
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  headers.set("Authorization", `Bearer ${access}`);
   if (orgId && !options.skipOrganizationHeader) {
     headers.set("X-Organization-Id", orgId);
   }
 
-  let response = await fetch(url(path), { ...init, headers });
+  let response = await fetch(url(path), { ...init, headers, credentials: FETCH_WITH_COOKIES });
 
   if (response.status === 401) {
     const refreshed = await refreshToken();
@@ -313,10 +293,7 @@ export async function request<T = unknown>(
       throw new UnauthorizedError();
     }
 
-    access = getAccessToken();
-    if (!access) throw new UnauthorizedError();
-    headers.set("Authorization", `Bearer ${access}`);
-    response = await fetch(url(path), { ...init, headers });
+    response = await fetch(url(path), { ...init, headers, credentials: FETCH_WITH_COOKIES });
   }
 
   if (response.status === 401) {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, CheckCircle2, Church, Plus, Search, XCircle } from "lucide-react";
+import { Building2, CheckCircle2, Church, Plus, Search, Trash2, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -34,8 +34,7 @@ import {
   deactivateIgreja,
   deleteIgreja,
   fetchIgrejasDoCampo,
-  isTipoCampo,
-  isTipoIgreja,
+  isInstanciaCampo,
   updateIgreja,
   type Igreja,
 } from "@/lib/portalApi";
@@ -46,7 +45,6 @@ type FormState = {
   cidade: string;
   uf: string;
   responsavel: string;
-  membros: string;
 };
 
 const emptyForm: FormState = {
@@ -55,7 +53,6 @@ const emptyForm: FormState = {
   cidade: "",
   uf: "",
   responsavel: "",
-  membros: "0",
 };
 
 export default function Igrejas() {
@@ -69,11 +66,7 @@ export default function Igrejas() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Igreja | null>(null);
 
-  const contextoCampo = organizacaoAtiva && isTipoCampo(organizacaoAtiva.tipo);
-  const contextoIgrejaDoCampo = Boolean(
-    organizacaoAtiva && isTipoIgreja(organizacaoAtiva.tipo) && organizacaoAtiva.parentId,
-  );
-  const podeGerenciarLista = contextoCampo || contextoIgrejaDoCampo;
+  const podeGerenciarLista = Boolean(organizacaoAtiva && isInstanciaCampo(organizacaoAtiva));
 
   const { data: igrejas = [], isLoading } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "igrejas", showInactive),
@@ -94,7 +87,6 @@ export default function Igrejas() {
         cidade: form.cidade.trim(),
         uf: form.uf.trim().toUpperCase(),
         responsavel: form.responsavel.trim(),
-        membros: Number(form.membros) || 0,
       };
       if (editing) {
         return updateIgreja(editing.id, payload);
@@ -175,7 +167,6 @@ export default function Igrejas() {
       cidade: igreja.cidade,
       uf: igreja.uf,
       responsavel: igreja.responsavel,
-      membros: String(igreja.membros),
     });
     setDialogOpen(true);
   }
@@ -306,10 +297,12 @@ export default function Igrejas() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="flex-1 touch-target text-destructive"
+                      className="touch-target text-destructive"
                       onClick={() => setDeleteTarget(igreja)}
+                      title="Excluir igreja"
                     >
-                      Excluir
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Excluir igreja</span>
                     </Button>
                   )}
                 </div>
@@ -355,16 +348,6 @@ export default function Igrejas() {
                 id="responsavel"
                 value={form.responsavel}
                 onChange={(e) => setForm({ ...form, responsavel: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="membros">Membros</Label>
-              <Input
-                id="membros"
-                type="number"
-                min={0}
-                value={form.membros}
-                onChange={(e) => setForm({ ...form, membros: e.target.value })}
               />
             </div>
           </div>

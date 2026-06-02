@@ -90,11 +90,3 @@ export function findLicaoDaSemana(
 
   return comData[0]?.licao ?? licoes[0];
 }
-
-export function countLicoesComAtividade(
-  licoes: Array<{ presentes: number; ausentes: number; status: string }>,
-) {
-  return licoes.filter(
-    (l) => l.status === "Finalizada" || l.presentes + l.ausentes > 0,
-  ).length;
-}

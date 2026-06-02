@@ -1,11 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Users, TrendingUp, DollarSign, UserPlus, BookOpen, CalendarDays,
-} from "lucide-react";
+import { Users, TrendingUp, DollarSign, UserPlus, CalendarDays } from "lucide-react";
+import { BirthdayDateBadge } from "@/components/dashboard/BirthdayDateBadge";
+import { BirthdayColumns } from "@/components/dashboard/BirthdayColumns";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
 import DashboardProfessor from "@/pages/DashboardProfessor";
@@ -15,11 +13,9 @@ import {
   fetchDashboardClassComposition,
   fetchDashboardOfferingEvolution,
   fetchDashboardSummary,
-  fetchLicoes,
-  isTipoCampo,
   weekLabel,
 } from "@/lib/portalApi";
-import { formatCurrency, getIniciais } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar,
@@ -37,8 +33,7 @@ export default function Dashboard() {
 }
 
 function DashboardIgreja() {
-  const { organizacaoAtiva, activeOrgId } = usePermissions();
-  const contextoCampo = Boolean(organizacaoAtiva && isTipoCampo(organizacaoAtiva.tipo));
+  const { activeOrgId } = usePermissions();
 
   const { data: summary } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-summary"),
@@ -59,11 +54,6 @@ function DashboardIgreja() {
   const { data: birthdays = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "dash-birthdays"),
     queryFn: fetchDashboardBirthdays,
-  });
-  const { data: licoes = [] } = useQuery({
-    queryKey: orgQueryKey(activeOrgId, "licoes"),
-    queryFn: () => fetchLicoes(),
-    enabled: !contextoCampo,
   });
 
   const hoje = new Date();
@@ -99,10 +89,15 @@ function DashboardIgreja() {
     { label: "Frequência Média", value: `${frequenciaMedia}%`, icon: TrendingUp, accent: "text-primary" },
     { label: "Total de Alunos", value: String(summary?.total_students ?? 0), icon: Users, accent: "text-secondary" },
     { label: "Ofertas", value: formatCurrency(Number(summary?.total_offerings ?? 0)), icon: DollarSign, accent: "text-success" },
-    { label: "Visitantes", value: String(0), icon: UserPlus, accent: "text-warning" },
+    { label: "Visitantes", value: String(summary?.total_visitors ?? 0), icon: UserPlus, accent: "text-warning" },
   ];
 
-  const proximaLicao = licoes.find((l) => l.status === "Aberta") ?? licoes[0];
+  const aniversariantes = birthdays.map((a: any, index: number) => ({
+    key: `${a.nome}-${a.turma ?? index}`,
+    nome: a.nome,
+    legenda: a.turma ?? "—",
+    badge: <BirthdayDateBadge data={a.data} hoje={a.dias_para_aniversario === 0} />,
+  }));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -174,7 +169,7 @@ function DashboardIgreja() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Evolução das Ofertas</CardTitle>
@@ -196,64 +191,18 @@ function DashboardIgreja() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="xl:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <CalendarDays className="h-4 w-4" /> Aniversariantes
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {birthdays.map((a: any) => (
-              <div key={a.nome} className="flex items-center gap-3">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
-                    {getIniciais(a.nome)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{a.nome}</p>
-                  <p className="text-xs text-muted-foreground">{a.turma ?? "—"}</p>
-                </div>
-                <Badge variant={a.dias_para_aniversario === 0 ? "default" : "secondary"} className="shrink-0 text-xs">
-                  {a.dias_para_aniversario === 0 ? "Hoje" : a.dias_para_aniversario === 1 ? "Amanhã" : `${a.dias_para_aniversario} dias`}
-                </Badge>
-              </div>
-            ))}
+          <CardContent>
+            <BirthdayColumns
+              items={aniversariantes}
+              emptyMessage="Nenhum aniversário nos próximos dias."
+            />
           </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BookOpen className="h-4 w-4" /> Próxima Lição
-            </CardTitle>
-          </CardHeader>
-          {proximaLicao && (
-            <CardContent className="space-y-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">Lição {proximaLicao.numero}:</span>
-                <p className="font-medium">{proximaLicao.tema}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Data</span>
-                  <p>{new Date(`${proximaLicao.data}T12:00:00`).toLocaleDateString("pt-BR")}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Revista</span>
-                  <p className="truncate">{proximaLicao.revista}</p>
-                </div>
-              </div>
-              <div className="text-xs">
-                <span className="text-muted-foreground">Texto Áureo</span>
-                <p className="italic">{proximaLicao.textoAureo}</p>
-              </div>
-              <div className="text-xs">
-                <span className="text-muted-foreground">Objetivo</span>
-                <p>{proximaLicao.objetivo}</p>
-              </div>
-            </CardContent>
-          )}
         </Card>
       </div>
     </div>

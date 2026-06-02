@@ -60,7 +60,6 @@ type FormState = {
   cidade: string;
   uf: string;
   responsavel: string;
-  membros: string;
 };
 
 const emptyForm: FormState = {
@@ -70,7 +69,6 @@ const emptyForm: FormState = {
   cidade: "",
   uf: "",
   responsavel: "",
-  membros: "0",
 };
 
 function labelFormato(instancia: InstanciaOrganizacao) {
@@ -106,7 +104,7 @@ export default function Organizacoes() {
         cidade: form.cidade.trim(),
         uf: form.uf.trim().toUpperCase(),
         responsavel: form.responsavel.trim(),
-        membros: Number(form.membros) || 0,
+        membros: 0,
       };
       if (editing) {
         return updateInstanciaOrganizacao(editing.id, payload);
@@ -188,7 +186,6 @@ export default function Organizacoes() {
       cidade: instancia.cidade,
       uf: instancia.uf,
       responsavel: instancia.responsavel,
-      membros: String(instancia.membros),
     });
     setDialogOpen(true);
   }
@@ -383,15 +380,6 @@ export default function Organizacoes() {
               <div className="space-y-2">
                 <Label>Sigla</Label>
                 <Input value={form.sigla} onChange={(e) => setForm((f) => ({ ...f, sigla: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Membros</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={form.membros}
-                  onChange={(e) => setForm((f) => ({ ...f, membros: e.target.value }))}
-                />
               </div>
               <div className="space-y-2">
                 <Label>Cidade</Label>

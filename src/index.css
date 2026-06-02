@@ -130,3 +130,9 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Recharts: rótulo do hover (fundo branco padrão; no dark mode herdava texto claro) */
+.recharts-tooltip-label {
+  color: hsl(215 25% 15%) !important;
+  font-weight: 600;
+}

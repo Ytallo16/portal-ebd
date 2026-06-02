@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowUpDown,
-  BookOpen,
   CalendarDays,
   ClipboardList,
   TrendingUp,
@@ -22,6 +21,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { BirthdayDateBadge } from "@/components/dashboard/BirthdayDateBadge";
+import { BirthdayColumns } from "@/components/dashboard/BirthdayColumns";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { ApiError } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -245,43 +246,7 @@ export default function DashboardProfessor() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BookOpen className="h-4 w-4" />
-              Próxima lição
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {!data.proximaLicao ? (
-              <p className="text-sm text-muted-foreground">Nenhuma lição cadastrada neste trimestre.</p>
-            ) : (
-              <>
-                <p className="font-medium">
-                  Lição {data.proximaLicao.numero}: {data.proximaLicao.tema}
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-muted-foreground">Data</span>
-                    <p>{formatDate(data.proximaLicao.data)}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Revista</span>
-                    <p className="truncate">{data.proximaLicao.revista || "—"}</p>
-                  </div>
-                </div>
-                {data.proximaLicao.textoAureo && (
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">Texto Áureo</span>
-                    <p className="italic">{data.proximaLicao.textoAureo}</p>
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
@@ -346,34 +311,20 @@ export default function DashboardProfessor() {
               Aniversariantes
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {data.aniversariantes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhum aniversário nos próximos 30 dias.</p>
-            ) : (
-              data.aniversariantes.map((aluno) => (
-                <div key={`${aluno.nome}-${aluno.data}`} className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-accent text-accent-foreground text-xs font-semibold">
-                      {getIniciais(aluno.nome)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{aluno.nome}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(aluno.data)}</p>
-                  </div>
-                  <Badge
-                    variant={aluno.diasParaAniversario === 0 ? "default" : "secondary"}
-                    className="shrink-0 text-xs"
-                  >
-                    {aluno.diasParaAniversario === 0
-                      ? "Hoje"
-                      : aluno.diasParaAniversario === 1
-                        ? "Amanhã"
-                        : `${aluno.diasParaAniversario} dias`}
-                  </Badge>
-                </div>
-              ))
-            )}
+          <CardContent>
+            <BirthdayColumns
+              items={data.aniversariantes.map((aluno) => ({
+                key: `${aluno.nome}-${aluno.data}`,
+                nome: aluno.nome,
+                badge: (
+                  <BirthdayDateBadge
+                    data={aluno.data}
+                    hoje={aluno.diasParaAniversario === 0}
+                  />
+                ),
+              }))}
+              emptyMessage="Nenhum aniversário nos próximos 30 dias."
+            />
           </CardContent>
         </Card>
       </div>

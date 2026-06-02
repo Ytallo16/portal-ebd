@@ -8,9 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { FaixaEtariaFields } from "@/components/turmas/FaixaEtariaFields";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
+import {
+  FAIXA_ETARIA_VAZIA,
+  formatFaixaEtaria,
+  type FaixaEtariaFormValue,
+  validarFaixaEtaria,
+} from "@/lib/faixaEtaria";
 import { createTurma, fetchTurmas } from "@/lib/portalApi";
+import { toast } from "sonner";
 
 export default function Turmas() {
   const queryClient = useQueryClient();
@@ -24,7 +32,12 @@ export default function Turmas() {
     enabled: podeCarregarOperacional,
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [form, setForm] = useState({ nome: "", faixaEtaria: "", cor: "#3B82F6" });
+  const [form, setForm] = useState({
+    nome: "",
+    cor: "#3B82F6",
+    faixa: { ...FAIXA_ETARIA_VAZIA },
+  });
+  const [faixaErro, setFaixaErro] = useState<string | null>(null);
   const createMutation = useMutation({
     mutationFn: createTurma,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["turmas"] }),
@@ -32,9 +45,26 @@ export default function Turmas() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await createMutation.mutateAsync(form);
+    const erroFaixa = validarFaixaEtaria(form.faixa);
+    if (erroFaixa) {
+      setFaixaErro(erroFaixa);
+      toast.error(erroFaixa);
+      return;
+    }
+    const faixaEtaria = formatFaixaEtaria(form.faixa);
+    setFaixaErro(null);
+    await createMutation.mutateAsync({
+      nome: form.nome,
+      cor: form.cor,
+      faixaEtaria,
+    });
     setIsDialogOpen(false);
-    setForm({ nome: "", faixaEtaria: "", cor: "#3B82F6" });
+    setForm({ nome: "", cor: "#3B82F6", faixa: { ...FAIXA_ETARIA_VAZIA } });
+  }
+
+  function atualizarFaixa(faixa: FaixaEtariaFormValue) {
+    setFaixaErro(null);
+    setForm((prev) => ({ ...prev, faixa }));
   }
 
   if (isLoading) {
@@ -99,10 +129,7 @@ export default function Turmas() {
               <Label>Nome</Label>
               <Input value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} required />
             </div>
-            <div>
-              <Label>Faixa etária</Label>
-              <Input value={form.faixaEtaria} onChange={(e) => setForm((prev) => ({ ...prev, faixaEtaria: e.target.value }))} required />
-            </div>
+            <FaixaEtariaFields value={form.faixa} onChange={atualizarFaixa} error={faixaErro} />
             <div>
               <Label>Cor</Label>
               <Input type="color" value={form.cor} onChange={(e) => setForm((prev) => ({ ...prev, cor: e.target.value }))} />

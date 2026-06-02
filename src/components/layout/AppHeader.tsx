@@ -23,7 +23,6 @@ import { usePermissions } from "@/auth/usePermissions";
 import { OrgContextSwitcher } from "@/components/layout/OrgContextSwitcher";
 import { getLicoesBreadcrumbs, getLicoesPageTitle } from "@/components/layout/licoesBreadcrumbs";
 import { isSomenteProfessor } from "@/lib/chamada";
-import { useAuth } from "@/auth/AuthProvider";
 
 function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boolean }) {
   const licoesTitle = getLicoesPageTitle(pathname, licoesOptions);
@@ -84,7 +83,6 @@ export function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const { logout } = useAuth();
   const { usuario: usuarioLogado, isAdminSistema, hasRole } = usePermissions();
   const licoesNavOptions = {
     somenteProfessor: isSomenteProfessor({ isAdminSistema, hasRole }),
@@ -151,14 +149,6 @@ export function AppHeader() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => navigate("/meu-perfil")}>Meu Perfil</DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={async () => {
-              await logout();
-              navigate("/login", { replace: true });
-            }}
-          >
-            Sair
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

@@ -7,7 +7,7 @@ import {
   BookMarked,
   Church,
   Settings,
-  Power,
+  LogOut,
   Building2,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -22,14 +22,14 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
 import { useAuth } from "@/auth/AuthProvider";
-import type { ModuloPermissao } from "@/lib/portalApi";
+import { deveExibirMenuIgrejas, type ModuloPermissao } from "@/lib/portalApi";
 
 const items: Array<{
   title: string;
@@ -41,7 +41,8 @@ const items: Array<{
   { title: "Dashboard", url: "/", icon: LayoutDashboard, modulo: "dashboard" },
   { title: "Lições", url: "/licoes", icon: BookOpen, modulo: "licoes" },
   { title: "Turmas", url: "/turmas", icon: GraduationCap, modulo: "turmas" },
-  { title: "Matriculados", url: "/alunos", icon: Users, modulo: "alunos" },
+  { title: "Alunos", url: "/alunos", icon: Users, modulo: "alunos" },
+  { title: "Professores", url: "/professores", icon: GraduationCap, modulo: "alunos" },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign, modulo: "financeiro", hideForProfessor: true },
   { title: "Revistas", url: "/revistas", icon: BookMarked, modulo: "revistas", hideForProfessor: true },
 ];
@@ -76,8 +77,12 @@ export function AppSidebar() {
   const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
   const secretarioCampo =
     !isAdminSistema && (usuario?.papeis ?? []).some((p) => p.trim().toUpperCase() === "SECRETARIO_CAMPO");
-  const showIgrejasMenu =
-    (secretarioCampo || isAdminSistema) && (isAdminSistema || can("organizacoes", "visualizar"));
+  const showIgrejasMenu = deveExibirMenuIgrejas({
+    isAdminSistema,
+    secretarioCampo,
+    canOrganizacoes: can("organizacoes", "visualizar"),
+    organizacaoAtiva,
+  });
 
   const menuItems = useMemo(() => {
     const base = items.filter((item) => {
@@ -92,7 +97,7 @@ export function AppSidebar() {
       { title: "Igrejas", url: "/igrejas", icon: Church, modulo: "organizacoes" as ModuloPermissao },
       ...base.slice(1),
     ];
-  }, [can, isAdminSistema, showIgrejasMenu, somenteProfessor]);
+  }, [can, isAdminSistema, organizacaoAtiva, showIgrejasMenu, somenteProfessor]);
   const configItems = useMemo(
     () =>
       configuracaoItems.filter((item) =>
@@ -115,30 +120,17 @@ export function AppSidebar() {
     <Sidebar collapsible="offcanvas" variant="floating">
       <SidebarHeader className="gap-0 border-b border-sidebar-border/50 px-4 py-4">
         {collapsed ? (
-          <div className="flex flex-col items-center gap-3">
-            <button
-              type="button"
-              title={usuario?.nome ?? "Usuário"}
-              onClick={() => {
-                closeOnMobile();
-                navigate("/meu-perfil");
-              }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
-            >
-              {usuario?.iniciais ?? "--"}
-            </button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground"
-              title="Sair"
-              onClick={() => void handleLogout()}
-            >
-              <Power className="h-4 w-4" />
-              <span className="sr-only">Sair</span>
-            </Button>
-          </div>
+          <button
+            type="button"
+            title={usuario?.nome ?? "Usuário"}
+            onClick={() => {
+              closeOnMobile();
+              navigate("/meu-perfil");
+            }}
+            className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/20 transition-transform hover:scale-[1.02]"
+          >
+            {usuario?.iniciais ?? "--"}
+          </button>
         ) : (
           <div className="flex items-center gap-3">
             <button
@@ -166,17 +158,6 @@ export function AppSidebar() {
                 {organizacaoAtiva?.nome ?? usuario?.papel ?? "sem contexto"}
               </p>
             </button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-11 w-11 shrink-0 rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground"
-              title="Sair"
-              onClick={() => void handleLogout()}
-            >
-              <Power className="h-4 w-4" />
-              <span className="sr-only">Sair</span>
-            </Button>
           </div>
         )}
       </SidebarHeader>
@@ -244,6 +225,21 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
+
+      <SidebarFooter className="mt-auto border-t border-sidebar-border/50 p-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Sair"
+              className="text-sidebar-muted hover:text-sidebar-foreground"
+              onClick={() => void handleLogout()}
+            >
+              <LogOut />
+              {!collapsed && <span>Sair</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

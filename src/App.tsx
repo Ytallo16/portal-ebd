@@ -17,11 +17,13 @@ import {
 } from "@/pages/licoes/LicoesLegacyRedirect";
 import Trimestres from "@/pages/Trimestres";
 import LicaoDetalhe from "@/pages/LicaoDetalhe";
+import FrequenciaProfessoresLicao from "@/pages/FrequenciaProfessoresLicao";
 import ClasseDetalhe from "@/pages/ClasseDetalhe";
 import Turmas from "@/pages/Turmas";
 import TurmaLicoes from "@/pages/TurmaLicoes";
 import TurmaDetalhe from "@/pages/TurmaDetalhe";
 import Alunos from "@/pages/Alunos";
+import Professores from "@/pages/Professores";
 import Financeiro from "@/pages/Financeiro";
 import Revistas from "@/pages/Revistas";
 import Configuracoes from "@/pages/Configuracoes";
@@ -69,6 +71,10 @@ const App = () => (
                 <Route path="/licoes/:ano/:trimestre" element={<LicoesTrimestre />} />
                 <Route path="/licoes/:ano/:trimestre/:licaoNumero" element={<LicaoDetalhe />} />
                 <Route
+                  path="/licoes/:ano/:trimestre/:licaoNumero/frequencia-professores"
+                  element={<FrequenciaProfessoresLicao />}
+                />
+                <Route
                   path="/licoes/:ano/:trimestre/:licaoNumero/turmas/:classId"
                   element={<ClasseDetalhe />}
                 />
@@ -79,6 +85,9 @@ const App = () => (
                 <Route path="/turmas/:id" element={<TurmaDetalhe />} />
                 <Route path="/turmas/:id/licoes" element={<TurmaLicoes />} />
                 <Route path="/alunos" element={<Alunos />} />
+                <Route path="/professores" element={<Professores />} />
+                <Route path="/ranking/professores" element={<Navigate to="/professores" replace />} />
+                <Route path="/matriculados" element={<Navigate to="/alunos" replace />} />
                 <Route path="/financeiro" element={<Financeiro />} />
                 <Route path="/revistas" element={<Revistas />} />
                 <Route path="/igrejas" element={<Igrejas />} />

@@ -531,7 +531,7 @@ function HeaderTurma({
   onBack,
 }: {
   turmaNome: string;
-  licao: { numero: number; tema: string };
+  licao: { numero: number };
   status?: ReturnType<typeof getChamadaTurmaStatus>;
   onBack: () => void;
 }) {
@@ -544,7 +544,6 @@ function HeaderTurma({
         <h1 className="text-2xl font-bold">{turmaNome}</h1>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <Badge variant="secondary">Lição {licao.numero}</Badge>
-          <span className="text-sm text-muted-foreground">{licao.tema}</span>
           {status && (
             <Badge variant={status === "registrada" ? "default" : "outline"}>
               {chamadaStatusLabel[status]}

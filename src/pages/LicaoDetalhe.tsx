@@ -26,6 +26,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -41,6 +42,7 @@ import {
   type ChamadaTurmaStatus,
 } from "@/lib/chamada";
 import {
+  createLicao,
   fetchAttendanceSheets,
   fetchLessonSchedules,
   fetchLicoes,
@@ -92,6 +94,7 @@ export default function LicaoDetalhe() {
   );
   const [confirmFinalize, setConfirmFinalize] = useState(false);
   const [escalaForm, setEscalaForm] = useState<Record<string, string>>({});
+  const [novaDataLicao, setNovaDataLicao] = useState("");
 
   const ano = Number(anoParam);
   const trimestre = Number(trimestreParam);
@@ -137,6 +140,11 @@ export default function LicaoDetalhe() {
   const licao = licoes.find((l) => l.numero === numeroLicao);
   const lessonId = licao?.id;
   const lessonFinalizada = licao?.status === "Finalizada";
+  const podeConfigurarLicao = can("licoes", "criar") || can("licoes", "editar");
+  const bloqueadoSemData = !licao;
+  const numeroExibicao = licao?.numero ?? numeroLicao;
+  const dataExibicao = licao ? formatDate(licao.data) : "Sem data";
+  const statusExibicao = licao?.status ?? "Pendente";
 
   const { data: turmas = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "turmas"),
@@ -276,38 +284,23 @@ export default function LicaoDetalhe() {
     },
   });
 
-  const professoresNaLicao = useMemo(() => {
-    const vistos = new Set<string>();
-    return turmasComChamada.flatMap((t) => {
-      const nome = t.professorNome;
-      if (nome === "—" || vistos.has(`${nome}-${t.turmaId}`)) return [];
-      vistos.add(`${nome}-${t.turmaId}`);
-      return [
-        {
-          nome,
-          turma: t.turmaNome,
-          registrado: Boolean(t.sheet),
-          escalado: Boolean(escalaPorTurma.get(t.turmaId)?.professorId),
-        },
-      ];
-    });
-  }, [turmasComChamada, escalaPorTurma]);
+  const createLessonMutation = useMutation({
+    mutationFn: () =>
+      createLicao({
+        numero: numeroLicao,
+        trimestre,
+        ano,
+        data: novaDataLicao,
+      }),
+    onSuccess: async () => {
+      toast.success("Lição criada com sucesso.");
+      await queryClient.invalidateQueries({ queryKey: ["licoes"] });
+    },
+    onError: () => toast.error("Não foi possível criar a lição."),
+  });
 
   if (loadingLicao) {
     return <p className="text-sm text-muted-foreground">Carregando lição...</p>;
-  }
-
-  if (!licao) {
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Lição {numeroLicao} ainda não cadastrada neste trimestre.
-        </p>
-        <Button variant="outline" onClick={() => navigate(licoesTrimestrePath(ano, trimestre))}>
-          Voltar ao trimestre
-        </Button>
-      </div>
-    );
   }
 
   return (
@@ -323,20 +316,27 @@ export default function LicaoDetalhe() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">
-              Lição {licao.numero} — {licao.tema}
-            </h1>
+            <h1 className="text-2xl font-bold">Lição {numeroExibicao}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">{formatDate(licao.data)}</span>
-              <Badge variant={licao.status === "Finalizada" ? "default" : "outline"}>
-                {licao.status}
+              <span className="text-sm text-muted-foreground">{dataExibicao}</span>
+              <Badge variant={licao?.status === "Finalizada" ? "default" : "outline"}>
+                {statusExibicao}
               </Badge>
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
-          {primeiraTurmaPendente && !lessonFinalizada && (
+          <Button
+            variant="secondary"
+            disabled={bloqueadoSemData}
+            onClick={() =>
+              navigate(`/licoes/${ano}/${trimestre}/${numeroLicao}/frequencia-professores`)
+            }
+          >
+            Frequência dos professores
+          </Button>
+          {primeiraTurmaPendente && !lessonFinalizada && !bloqueadoSemData && (
             <Button
               variant="outline"
               onClick={() =>
@@ -345,7 +345,7 @@ export default function LicaoDetalhe() {
                 )
               }
             >
-              {isProfessor ? "Registrar minha EBD" : "Registrar EBD"}
+              {isProfessor ? "Registrar minha EBD" : "Registrar Aula"}
             </Button>
           )}
           {podeFinalizarLicao && (
@@ -353,6 +353,37 @@ export default function LicaoDetalhe() {
           )}
         </div>
       </div>
+
+      {!licao && (
+        <div className="rounded-lg border border-dashed bg-muted/30 p-3 sm:p-4">
+          {podeConfigurarLicao ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Lição pendente: defina a data para liberar registros e escala.
+              </p>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <Input
+                  type="date"
+                  className="sm:w-48"
+                  value={novaDataLicao}
+                  onChange={(event) => setNovaDataLicao(event.target.value)}
+                />
+                <Button
+                  size="sm"
+                  onClick={() => createLessonMutation.mutate()}
+                  disabled={!novaDataLicao || createLessonMutation.isPending}
+                >
+                  {createLessonMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Você não tem permissão para configurar a data desta lição.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <Card>
@@ -442,7 +473,7 @@ export default function LicaoDetalhe() {
       </div>
 
       {podeEscalarProfessores && (
-        <Card>
+        <Card className={bloqueadoSemData ? "opacity-70" : undefined}>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4" />
@@ -451,6 +482,11 @@ export default function LicaoDetalhe() {
             <p className="text-xs text-muted-foreground">
               Defina quem ministra esta lição em cada turma. O professor verá a aula no painel dele.
             </p>
+            {bloqueadoSemData && (
+              <p className="text-xs text-muted-foreground">
+                Defina a data da lição para liberar a escala de professores.
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {turmas.length === 0 ? (
@@ -469,6 +505,7 @@ export default function LicaoDetalhe() {
                       </div>
                       <Select
                         value={escalaForm[turma.id] || "__none"}
+                        disabled={bloqueadoSemData}
                         onValueChange={(value) =>
                           setEscalaForm((prev) => ({
                             ...prev,
@@ -500,7 +537,7 @@ export default function LicaoDetalhe() {
                 <div className="flex justify-end">
                   <Button
                     onClick={() => saveEscalaMutation.mutate()}
-                    disabled={saveEscalaMutation.isPending || !lessonId}
+                    disabled={bloqueadoSemData || saveEscalaMutation.isPending || !lessonId}
                   >
                     {saveEscalaMutation.isPending ? "Salvando..." : "Salvar escala"}
                   </Button>
@@ -517,6 +554,11 @@ export default function LicaoDetalhe() {
           <p className="text-xs text-muted-foreground">
             Clique na turma para registrar ou revisar presenças, totais e ofertas.
           </p>
+          {bloqueadoSemData && (
+            <p className="text-xs text-muted-foreground">
+              Defina a data da lição para liberar o registro/chamada por turma.
+            </p>
+          )}
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -538,10 +580,11 @@ export default function LicaoDetalhe() {
                 return (
                   <tr
                     key={t.turmaId}
-                    className="cursor-pointer border-b transition-colors hover:bg-muted/50"
-                    onClick={() =>
-                      navigate(licoesTurmaPath(ano, trimestre, numeroLicao, t.turmaId))
-                    }
+                    className={`border-b transition-colors ${bloqueadoSemData ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/50"}`}
+                    onClick={() => {
+                      if (bloqueadoSemData) return;
+                      navigate(licoesTurmaPath(ano, trimestre, numeroLicao, t.turmaId));
+                    }}
                   >
                     <td className="p-2 font-medium">{t.turmaNome}</td>
                     <td className="p-2 text-muted-foreground">{t.professorNome}</td>
@@ -562,33 +605,6 @@ export default function LicaoDetalhe() {
               })}
             </tbody>
           </table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Professores escalados / nas chamadas</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {professoresNaLicao.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhum professor escalado ou registrado nas fichas.
-            </p>
-          ) : (
-            professoresNaLicao.map((p) => (
-              <div key={`${p.nome}-${p.turma}`} className="flex items-center gap-2 text-sm">
-                <CheckCircle
-                  className={`h-4 w-4 ${p.registrado ? "text-success" : p.escalado ? "text-primary" : "text-muted-foreground"}`}
-                />
-                <span>
-                  {p.nome} <span className="text-muted-foreground">({p.turma})</span>
-                  {!p.registrado && p.escalado ? (
-                    <span className="ml-1 text-xs text-muted-foreground">· escalado</span>
-                  ) : null}
-                </span>
-              </div>
-            ))
-          )}
         </CardContent>
       </Card>
 

@@ -64,6 +64,8 @@ export function usePermissions() {
       podeCarregarOperacional: Boolean(
         usuario?.organizacaoAtiva && isTipoIgreja(usuario.organizacaoAtiva.tipo),
       ),
+      podeVisualizarFinanceiro:
+        Boolean(permissoes.financeiro?.visualizar) && Boolean(usuario?.organizacaoAtiva),
       acessoBloqueado: Boolean(usuario?.acessoBloqueado),
       motivoBloqueio: usuario?.motivoBloqueio ?? null,
     };

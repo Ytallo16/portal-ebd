@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  countLicoesComAtividade,
   findLicaoDaSemana,
   licoesGerenciarTrimestresPath,
   licoesDestinoAoAbrirLicao,
@@ -152,8 +151,6 @@ export default function LicoesHub() {
             <TrimestreCard
               key={t.id}
               trimestre={t}
-              activeOrgId={activeOrgId}
-              podeCarregar={podeCarregarOperacional}
               onOpen={() => navigate(licoesTrimestrePath(t.ano, t.numero))}
             />
           ))}
@@ -165,22 +162,11 @@ export default function LicoesHub() {
 
 function TrimestreCard({
   trimestre,
-  activeOrgId,
-  podeCarregar,
   onOpen,
 }: {
   trimestre: Trimestre;
-  activeOrgId: string | null;
-  podeCarregar: boolean;
   onOpen: () => void;
 }) {
-  const { data: licoes = [] } = useQuery({
-    queryKey: orgQueryKey(activeOrgId, "licoes-resumo", trimestre.ano, trimestre.numero),
-    queryFn: () => fetchLicoes({ trimestre: trimestre.numero, ano: trimestre.ano }),
-    enabled: podeCarregar,
-  });
-
-  const comAtividade = countLicoesComAtividade(licoes);
   const emAndamento = trimestre.status === "EM_ANDAMENTO";
 
   return (
@@ -213,9 +199,6 @@ function TrimestreCard({
           >
             {statusTrimestreLabel[trimestre.status]}
           </Badge>
-          <p className="text-sm text-muted-foreground">
-            {comAtividade} de {trimestre.quantidadeLicoes} lições com registro
-          </p>
           <p className="text-xs text-muted-foreground">
             {trimestre.dataInicio || "—"} até {trimestre.dataFim || "—"}
           </p>

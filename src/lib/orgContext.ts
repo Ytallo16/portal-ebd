@@ -3,7 +3,6 @@ const OPERATIONAL_PREFIXES = [
   "/licoes",
   "/turmas",
   "/alunos",
-  "/financeiro",
   "/revistas",
 ] as const;
 

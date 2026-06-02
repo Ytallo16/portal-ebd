@@ -21,7 +21,7 @@ export function turmaExigeResponsavel(faixaEtaria: string, nomeTurma = ""): bool
     return true;
   }
 
-  const faixa = text.match(/(\d+)\s*[-–]\s*(\d+)/);
+  const faixa = text.match(/(\d+)\s*(?:-|–|a)\s*(\d+)/);
   if (faixa) {
     return Number(faixa[2]) <= 12;
   }

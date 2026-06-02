@@ -30,6 +30,15 @@ export type Matriculado = {
   alunoId?: string;
 };
 
+export type ProfessorMatriculado = {
+  id: string;
+  professorId: string;
+  nome: string;
+  turmaId: string;
+  turmaNome: string;
+  linkId: string;
+};
+
 export function buildMatriculados(alunos: Aluno[], turmas: Turma[]): Matriculado[] {
   const turmaNomeById = new Map(turmas.map((t) => [t.id, t.nome]));
   const items: Matriculado[] = [];
@@ -57,6 +66,37 @@ export function buildMatriculados(alunos: Aluno[], turmas: Turma[]): Matriculado
     }
   }
 
+  return items.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+export function buildMatriculadosAlunos(alunos: Aluno[], turmas: Turma[]): Matriculado[] {
+  const turmaNomeById = new Map(turmas.map((t) => [t.id, t.nome]));
+  return alunos
+    .map((aluno) => ({
+      id: `aluno-${aluno.id}`,
+      nome: aluno.nome,
+      turmaId: aluno.turmaId,
+      turmaNome: turmaNomeById.get(aluno.turmaId) ?? "",
+      tipo: "ALUNO" as const,
+      alunoId: aluno.id,
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+export function buildMatriculadosProfessores(turmas: Turma[]): ProfessorMatriculado[] {
+  const items: ProfessorMatriculado[] = [];
+  for (const turma of turmas) {
+    for (const professor of turma.professorUsers) {
+      items.push({
+        id: `professor-${professor.id}-turma-${turma.id}`,
+        professorId: String(professor.id),
+        nome: professor.nome,
+        turmaId: turma.id,
+        turmaNome: turma.nome,
+        linkId: professor.linkId,
+      });
+    }
+  }
   return items.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
@@ -117,6 +157,77 @@ export type Oferta = {
   ano: number;
 };
 
+export type FinanceResumoFilters = {
+  classId?: string;
+  lessonId?: string;
+  trimestre?: number;
+  ano?: number;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type FinanceLancamentosFilters = FinanceResumoFilters & {
+  page?: number;
+  pageSize?: number;
+};
+
+export type FinanceResumoPaginacao = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type FinanceResumoDestaque = {
+  label: string;
+  valor: number;
+};
+
+export type FinanceResumoPorIgreja = {
+  organizationId: number;
+  nome: string;
+  valor: number;
+  lancamentos: number;
+};
+
+export type FinanceResumoPorTurma = {
+  classId: number;
+  nome: string;
+  valor: number;
+  cor: string;
+};
+
+export type FinanceResumoRecente = {
+  id: number;
+  data: string;
+  valor: number;
+  igrejaNome: string | null;
+  turmaNome: string | null;
+  licaoTema: string | null;
+  licaoId: number | null;
+  turmaId: number | null;
+  organizationId: number | null;
+};
+
+export type FinanceResumo = {
+  scope: "campo" | "igreja";
+  organizacaoNome: string;
+  summary: {
+    total: number;
+    media: number;
+    lancamentos: number;
+    destaque: FinanceResumoDestaque;
+  };
+  evolucaoMensal: Array<{ mes: string; valor: number }>;
+  porIgreja: FinanceResumoPorIgreja[];
+  porTurma: FinanceResumoPorTurma[];
+};
+
+export type FinanceLancamentos = {
+  items: FinanceResumoRecente[];
+  paginacao: FinanceResumoPaginacao;
+};
+
 export type ControleRevista = {
   id: string;
   nome: string;
@@ -170,6 +281,7 @@ export type OrganizacaoContexto = {
   id: number;
   nome: string;
   tipo: string;
+  formato: string;
   parentId: number | null;
   parentNome: string | null;
 };
@@ -212,12 +324,24 @@ export type AttendanceSheet = {
   lesson: string;
   classGroup: string;
   professor?: number | null;
+  professorPresente?: boolean;
   visitantes: number;
   biblias: number;
   revistas: number;
   ofertaValor: number;
   finalizedAt?: string | null;
   records: Array<{ id: string; student: string; alunoNome: string; presente: boolean }>;
+};
+
+export type ProfessorRankingItem = {
+  professorId: number;
+  professorNome: string;
+  turmaIds: string[];
+  turmaNomes: string[];
+  presencas: number;
+  ausencias: number;
+  totalRegistros: number;
+  presencaPct: number;
 };
 
 function mapStatus(status: string): "Aberta" | "Finalizada" {
@@ -601,6 +725,7 @@ function mapAttendanceSheet(item: any): AttendanceSheet {
     lesson: String(item.lesson),
     classGroup: String(item.class_group),
     professor: item.professor ?? null,
+    professorPresente: Boolean(item.professor_presente),
     visitantes: item.visitantes ?? 0,
     biblias: item.biblias ?? 0,
     revistas: item.revistas ?? 0,
@@ -636,6 +761,20 @@ export async function fetchAttendanceSheets(): Promise<AttendanceSheet[]> {
   return items.map(mapAttendanceSheet);
 }
 
+export async function fetchProfessorRanking(filters: {
+  trimestre: number;
+  ano: number;
+  classId?: string;
+}): Promise<ProfessorRankingItem[]> {
+  const params = new URLSearchParams({
+    trimestre: String(filters.trimestre),
+    ano: String(filters.ano),
+  });
+  if (filters.classId) params.set("class_id", filters.classId);
+  const data = await request<ProfessorRankingItem[]>(`/dashboard/professor-ranking?${params.toString()}`);
+  return data ?? [];
+}
+
 export async function createAttendanceSheet(payload: {
   lesson: string;
   classGroup: string;
@@ -664,6 +803,7 @@ export async function updateAttendanceSheet(
   sheetId: string,
   payload: Partial<{
     professor: number | null;
+    professorPresente: boolean;
     visitantes: number;
     biblias: number;
     revistas: number;
@@ -672,6 +812,7 @@ export async function updateAttendanceSheet(
 ) {
   const body: Record<string, unknown> = {};
   if (payload.professor !== undefined) body.professor = payload.professor;
+  if (payload.professorPresente !== undefined) body.professor_presente = payload.professorPresente;
   if (payload.visitantes !== undefined) body.visitantes = payload.visitantes;
   if (payload.biblias !== undefined) body.biblias = payload.biblias;
   if (payload.revistas !== undefined) body.revistas = payload.revistas;
@@ -774,6 +915,106 @@ export async function fetchOfferings(classId?: string): Promise<Oferta[]> {
     trimestre: 0,
     ano: Number(item.data?.slice(0, 4) ?? 0),
   }));
+}
+
+function mapFinanceResumo(data: Record<string, unknown>): FinanceResumo {
+  const summary = data.summary as Record<string, unknown>;
+  const destaque = summary.destaque as Record<string, unknown>;
+  return {
+    scope: data.scope as FinanceResumo["scope"],
+    organizacaoNome: String(data.organizacao_nome ?? ""),
+    summary: {
+      total: Number(summary.total ?? 0),
+      media: Number(summary.media ?? 0),
+      lancamentos: Number(summary.lancamentos ?? 0),
+      destaque: {
+        label: String(destaque.label ?? "—"),
+        valor: Number(destaque.valor ?? 0),
+      },
+    },
+    evolucaoMensal: ((data.evolucao_mensal as unknown[]) ?? []).map((row) => {
+      const item = row as Record<string, unknown>;
+      return { mes: String(item.mes), valor: Number(item.valor ?? 0) };
+    }),
+    porIgreja: ((data.por_igreja as unknown[]) ?? []).map((row) => {
+      const item = row as Record<string, unknown>;
+      return {
+        organizationId: Number(item.organization_id),
+        nome: String(item.nome ?? "—"),
+        valor: Number(item.valor ?? 0),
+        lancamentos: Number(item.lancamentos ?? 0),
+      };
+    }),
+    porTurma: ((data.por_turma as unknown[]) ?? []).map((row) => {
+      const item = row as Record<string, unknown>;
+      return {
+        classId: Number(item.class_id),
+        nome: String(item.nome ?? "—"),
+        valor: Number(item.valor ?? 0),
+        cor: String(item.cor ?? ""),
+      };
+    }),
+  };
+}
+
+function mapLancamentoItem(item: Record<string, unknown>): FinanceResumoRecente {
+  return {
+    id: Number(item.id),
+    data: String(item.data),
+    valor: Number(item.valor ?? 0),
+    igrejaNome: item.igreja_nome != null ? String(item.igreja_nome) : null,
+    turmaNome: item.turma_nome != null ? String(item.turma_nome) : null,
+    licaoTema: item.licao_tema != null ? String(item.licao_tema) : null,
+    licaoId: item.licao_id != null ? Number(item.licao_id) : null,
+    turmaId: item.turma_id != null ? Number(item.turma_id) : null,
+    organizationId: item.organization_id != null ? Number(item.organization_id) : null,
+  };
+}
+
+function mapFinanceLancamentos(data: Record<string, unknown>): FinanceLancamentos {
+  const pag = (data.paginacao as Record<string, unknown>) ?? {};
+  return {
+    items: ((data.items as unknown[]) ?? []).map((row) =>
+      mapLancamentoItem(row as Record<string, unknown>),
+    ),
+    paginacao: {
+      page: Number(pag.page ?? 1),
+      pageSize: Number(pag.page_size ?? 5),
+      total: Number(pag.total ?? 0),
+      totalPages: Number(pag.total_pages ?? 1),
+    },
+  };
+}
+
+function buildFinanceFilterParams(filters: FinanceResumoFilters, params: URLSearchParams) {
+  if (filters.classId) params.set("class_id", filters.classId);
+  if (filters.lessonId) params.set("lesson_id", filters.lessonId);
+  if (filters.trimestre != null) params.set("trimestre", String(filters.trimestre));
+  if (filters.ano != null) params.set("ano", String(filters.ano));
+  if (filters.dateFrom) params.set("date_from", filters.dateFrom);
+  if (filters.dateTo) params.set("date_to", filters.dateTo);
+}
+
+export async function fetchFinanceResumo(
+  filters: FinanceResumoFilters = {},
+): Promise<FinanceResumo> {
+  const params = new URLSearchParams();
+  buildFinanceFilterParams(filters, params);
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const data = await request<Record<string, unknown>>(`/finance/resumo/${query}`);
+  return mapFinanceResumo(data);
+}
+
+export async function fetchFinanceLancamentos(
+  filters: FinanceLancamentosFilters = {},
+): Promise<FinanceLancamentos> {
+  const params = new URLSearchParams();
+  buildFinanceFilterParams(filters, params);
+  if (filters.page != null) params.set("page", String(filters.page));
+  if (filters.pageSize != null) params.set("page_size", String(filters.pageSize));
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const data = await request<Record<string, unknown>>(`/finance/lancamentos/${query}`);
+  return mapFinanceLancamentos(data);
 }
 
 export async function fetchPublicationControls(
@@ -919,6 +1160,7 @@ export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
       id: org.id,
       nome: org.nome,
       tipo: org.tipo,
+      formato: org.formato ?? "",
       parentId: org.parent_id ?? null,
       parentNome: org.parent_nome ?? null,
     };
@@ -1165,6 +1407,60 @@ export function isTipoIgreja(tipo: string) {
   return normalized === "IGREJA" || normalized === "FILIAL" || normalized === "CONGREGACAO";
 }
 
+/** Instância contratada como campo (várias igrejas no ecossistema). */
+export function isInstanciaCampo(org: OrganizacaoContexto | null | undefined) {
+  if (!org) return false;
+  const formato = org.formato.trim().toUpperCase();
+  if (formato === "CAMPO") return true;
+  if (formato === "IGREJA_INDIVIDUAL") return false;
+  return isTipoCampo(org.tipo);
+}
+
+/** Instância contratada como uma única igreja (sem campo pai). */
+export function isInstanciaIgrejaIndividual(org: OrganizacaoContexto | null | undefined) {
+  if (!org) return false;
+  const formato = org.formato.trim().toUpperCase();
+  if (formato === "IGREJA_INDIVIDUAL") return true;
+  if (formato === "CAMPO") return false;
+  return isTipoIgreja(org.tipo) && org.parentId == null;
+}
+
+/** Igreja vinculada a um campo (visão operacional), não contrato individual. */
+export function isIgrejaFilhaDeCampo(org: OrganizacaoContexto | null | undefined) {
+  if (!org) return false;
+  if (isInstanciaIgrejaIndividual(org)) return false;
+  return isTipoIgreja(org.tipo) && org.parentId != null;
+}
+
+/** Id do campo quando o contexto ativo é o campo ou uma igreja filha dele. */
+export function resolveCampoIdDoContexto(org: OrganizacaoContexto | null | undefined): number | null {
+  if (!org) return null;
+  if (isInstanciaCampo(org)) return org.id;
+  if (isIgrejaFilhaDeCampo(org)) return org.parentId;
+  return null;
+}
+
+/** Menu Igrejas na sidebar: só com instância CAMPO ativa (não na visão de uma igreja). */
+export function deveExibirMenuIgrejas(params: {
+  isAdminSistema: boolean;
+  secretarioCampo: boolean;
+  canOrganizacoes: boolean;
+  organizacaoAtiva: OrganizacaoContexto | null | undefined;
+}) {
+  const temPapel =
+    (params.secretarioCampo || params.isAdminSistema) &&
+    (params.isAdminSistema || params.canOrganizacoes);
+  return temPapel && isInstanciaCampo(params.organizacaoAtiva);
+}
+
+/** Seletor de igrejas no header: no campo ou operando visão de igreja filha (para trocar). */
+export function deveExibirSeletorIgrejasNoHeader(
+  organizacaoAtiva: OrganizacaoContexto | null | undefined,
+) {
+  if (!organizacaoAtiva || isInstanciaIgrejaIndividual(organizacaoAtiva)) return false;
+  return isInstanciaCampo(organizacaoAtiva) || isIgrejaFilhaDeCampo(organizacaoAtiva);
+}
+
 function mapIgreja(item: any): Igreja {
   const ativa = item.is_active !== false && (item.status ?? "ATIVA").toUpperCase() === "ATIVA";
   return {
@@ -1315,3 +1611,31 @@ export async function fetchIgrejasDaInstancia(campoId: string, includeInactive =
   const data = await request<unknown>(`/organizations/${campoId}/churches/${params}`, {}, { ensureOrganization: false });
   return getResults<any>(data).map(mapIgreja);
 }
+
+export const studentsApi = {
+  fetchAlunos,
+  createAluno,
+  updateAluno,
+  deleteAluno,
+  buildMatriculadosAlunos,
+};
+
+export const teachersApi = {
+  fetchProfessoresIgreja,
+  addProfessorTurma,
+  removeProfessorTurma,
+  buildMatriculadosProfessores,
+};
+
+export const attendanceApi = {
+  fetchAttendanceByLessonClass,
+  fetchAttendanceSheets,
+  createAttendanceSheet,
+  updateAttendanceSheet,
+  saveAttendanceRecords,
+  ensureAttendanceSheet,
+};
+
+export const rankingApi = {
+  fetchProfessorRanking,
+};

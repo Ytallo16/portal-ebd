@@ -76,7 +76,10 @@ export default function Usuarios() {
 
   const toggleMutation = useMutation({
     mutationFn: (userId: string) => toggleUserActive(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["usuarios"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["turmas"] });
+    },
   });
   const resetPasswordMutation = useMutation({
     mutationFn: (userId: string) => resetUserPassword(userId),

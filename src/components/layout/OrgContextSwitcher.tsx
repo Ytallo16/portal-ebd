@@ -20,7 +20,14 @@ import {
   isSecretarioCampoUsuario,
 } from "@/lib/orgContextSelection";
 import { cn } from "@/lib/utils";
-import { isTipoCampo, isTipoIgreja, type OrganizacaoContexto } from "@/lib/portalApi";
+import {
+  deveExibirSeletorIgrejasNoHeader,
+  isInstanciaCampo,
+  isInstanciaIgrejaIndividual,
+  isIgrejaFilhaDeCampo,
+  resolveCampoIdDoContexto,
+  type OrganizacaoContexto,
+} from "@/lib/portalApi";
 
 type OrgContextSwitcherProps = {
   variant?: "header" | "card";
@@ -36,6 +43,7 @@ function SelectIgrejas({
   compacto,
   onChange,
   disabled,
+  campoVisaoGeral,
 }: {
   igrejas: OrganizacaoContexto[];
   value?: string;
@@ -44,6 +52,8 @@ function SelectIgrejas({
   compacto: boolean;
   onChange: (id: string) => void;
   disabled?: boolean;
+  /** Opção para voltar ao contexto do campo (visão agregada, sem igreja específica). */
+  campoVisaoGeral?: { id: number; nome: string };
 }) {
   return (
     <Select value={value} onValueChange={onChange} disabled={disabled}>
@@ -61,6 +71,14 @@ function SelectIgrejas({
         </div>
       </SelectTrigger>
       <SelectContent>
+        {campoVisaoGeral && (
+          <SelectGroup>
+            <SelectLabel>Campo</SelectLabel>
+            <SelectItem value={String(campoVisaoGeral.id)}>
+              {compacto ? "Visão geral" : `Visão geral — ${campoVisaoGeral.nome}`}
+            </SelectItem>
+          </SelectGroup>
+        )}
         <SelectGroup>
           <SelectLabel>Igrejas</SelectLabel>
           {igrejas.map((org) => (
@@ -89,66 +107,66 @@ export function OrgContextSwitcher({ variant = "card", igrejaOnly = false }: Org
 
   const papeis = usuario?.papeis ?? [];
   const secretarioCampo = isSecretarioCampoUsuario(papeis, isAdminSistema);
-  const contextoCampoAtivo = Boolean(organizacaoAtiva && isTipoCampo(organizacaoAtiva.tipo));
-  const contextoIgrejaAtivo = Boolean(organizacaoAtiva && isTipoIgreja(organizacaoAtiva.tipo));
+  const contextoIgrejaIndividual = isInstanciaIgrejaIndividual(organizacaoAtiva);
+  const campoId = resolveCampoIdDoContexto(organizacaoAtiva);
+  const mostrarSeletorIgrejas =
+    Boolean(campoId) &&
+    (isAdminSistema || secretarioCampo) &&
+    deveExibirSeletorIgrejasNoHeader(organizacaoAtiva);
 
   if (isLoading) {
     return null;
   }
 
-  // Admin (ou qualquer um) já dentro de uma igreja: sem select no header
-  if (contextoIgrejaAtivo && !igrejaOnly) {
+  // Contrato de igreja única: sem seletor
+  if (contextoIgrejaIndividual && !igrejaOnly) {
     return null;
   }
 
-  // Admin dentro de um campo: listar só igrejas desse campo
-  if (isAdminSistema && contextoCampoAtivo && organizacaoAtiva) {
-    const igrejas = igrejasDoCampo(organizacoesDisponiveis, organizacaoAtiva.id);
+  // Campo ou visão de igreja filha: seletor permanece para trocar de igreja
+  if (mostrarSeletorIgrejas || (igrejaOnly && isInstanciaCampo(organizacaoAtiva))) {
+    const igrejas = isAdminSistema
+      ? igrejasDoCampo(organizacoesDisponiveis, campoId!)
+      : igrejasDoSecretarioCampo(organizacoesDisponiveis);
+
     if (igrejas.length === 0) {
-      return <p className="text-xs text-muted-foreground">Nenhuma igreja cadastrada neste campo.</p>;
+      return (
+        <p className="text-xs text-muted-foreground">
+          Nenhuma igreja cadastrada neste campo.
+        </p>
+      );
     }
-    const valueInList = organizacaoAtiva && igrejas.some((o) => o.id === organizacaoAtiva.id);
+
+    const campoOrg = organizacoesDisponiveis.find((o) => o.id === campoId);
+    const campoVisaoGeral = campoOrg
+      ? { id: campoOrg.id, nome: campoOrg.nome }
+      : { id: campoId!, nome: "Campo" };
+
+    const igrejaAtiva =
+      organizacaoAtiva && isIgrejaFilhaDeCampo(organizacaoAtiva) ? organizacaoAtiva : null;
+    const valueAtual =
+      organizacaoAtiva && isInstanciaCampo(organizacaoAtiva)
+        ? String(campoId)
+        : igrejaAtiva && igrejas.some((o) => o.id === igrejaAtiva.id)
+          ? String(igrejaAtiva.id)
+          : String(campoId);
+
     return (
       <SelectIgrejas
         igrejas={igrejas}
-        value={valueInList ? String(organizacaoAtiva!.id) : undefined}
-        placeholder="Selecione uma igreja"
+        value={valueAtual}
+        placeholder="Visão geral ou igreja"
         variant={variant}
         compacto
         disabled={mutation.isPending}
+        campoVisaoGeral={campoVisaoGeral}
         onChange={(next) => mutation.mutate(next)}
       />
     );
   }
 
-  // Secretário de campo (ou card forçando igrejas): igrejas do(s) campo(s) dele
-  if (secretarioCampo || igrejaOnly) {
-    const igrejas = secretarioCampo
-      ? igrejasDoSecretarioCampo(organizacoesDisponiveis)
-      : organizacaoAtiva && contextoCampoAtivo
-        ? igrejasDoCampo(organizacoesDisponiveis, organizacaoAtiva.id)
-        : groupOrganizations(organizacoesDisponiveis).igrejas;
-
-    if (igrejas.length === 0) {
-      return <p className="text-xs text-muted-foreground">Nenhuma igreja disponível.</p>;
-    }
-
-    const valueInList = organizacaoAtiva && igrejas.some((o) => o.id === organizacaoAtiva.id);
-    return (
-      <SelectIgrejas
-        igrejas={igrejas}
-        value={valueInList ? String(organizacaoAtiva!.id) : undefined}
-        placeholder="Selecione uma igreja"
-        variant={variant}
-        compacto
-        disabled={mutation.isPending}
-        onChange={(next) => mutation.mutate(next)}
-      />
-    );
-  }
-
-  // Admin sem contexto de campo/igreja: escolher instância (campo ou igreja individual)
-  if (isAdminSistema) {
+  // Admin sem ecossistema de campo: escolher instância (campo ou igreja individual)
+  if (isAdminSistema && !mostrarSeletorIgrejas) {
     const instancias = instanciasTopLevel(organizacoesDisponiveis);
     if (instancias.length <= 1) {
       return null;

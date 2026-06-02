@@ -56,7 +56,6 @@ export default function OrganizacaoDetalhe() {
     cidade: "",
     uf: "",
     responsavel: "",
-    membros: "0",
   });
 
   const { data: instancia, isLoading } = useQuery({
@@ -87,7 +86,7 @@ export default function OrganizacaoDetalhe() {
         cidade: form.cidade.trim(),
         uf: form.uf.trim().toUpperCase(),
         responsavel: form.responsavel.trim(),
-        membros: Number(form.membros) || 0,
+        membros: 0,
       }),
     onSuccess: () => {
       toast.success("Instância atualizada.");
@@ -129,7 +128,6 @@ export default function OrganizacaoDetalhe() {
       cidade: instancia.cidade,
       uf: instancia.uf,
       responsavel: instancia.responsavel,
-      membros: String(instancia.membros),
     });
     setEditOpen(true);
   }
@@ -194,15 +192,6 @@ export default function OrganizacaoDetalhe() {
                 {isCampo ? "Campo" : "Igreja individual"}
               </p>
               <p className="text-xs text-muted-foreground">Tipo da instância</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Users className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-xl font-bold">{instancia.membros}</p>
-              <p className="text-xs text-muted-foreground">Membros</p>
             </div>
           </CardContent>
         </Card>
@@ -277,15 +266,6 @@ export default function OrganizacaoDetalhe() {
             <div className="space-y-2">
               <Label>Sigla</Label>
               <Input value={form.sigla} onChange={(e) => setForm((f) => ({ ...f, sigla: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Membros</Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.membros}
-                onChange={(e) => setForm((f) => ({ ...f, membros: e.target.value }))}
-              />
             </div>
             <div className="space-y-2">
               <Label>Cidade</Label>
