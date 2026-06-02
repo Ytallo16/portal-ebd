@@ -11,11 +11,11 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="flex h-svh w-full overflow-hidden bg-muted/40">
+      <div className="flex h-[100dvh] w-full overflow-hidden bg-muted/40">
         <AppSidebar />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <AppHeader />
-          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6">
+          <main className="safe-area-bottom min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain p-3 pb-4 md:p-6 md:pb-6">
             {skipContextGate ? <Outlet /> : (
               <ContextRequiredGate>
                 <Outlet />

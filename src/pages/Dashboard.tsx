@@ -127,7 +127,8 @@ function DashboardIgreja() {
             <CardTitle className="text-base">Evolução da Frequência</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+            <div className="chart-container">
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={frequenciaSemanal}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="semana" tick={{ fontSize: 10 }} interval={0} />
@@ -136,6 +137,7 @@ function DashboardIgreja() {
                 <Line type="monotone" dataKey="presentes" stroke="hsl(207,79%,33%)" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -144,7 +146,8 @@ function DashboardIgreja() {
             <CardTitle className="text-base">Composição por Classe</CardTitle>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <ResponsiveContainer width="100%" height={200}>
+            <div className="chart-container w-full max-w-sm">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={composicaoPorClasse.slice(0, 7)}
@@ -165,6 +168,7 @@ function DashboardIgreja() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -175,7 +179,8 @@ function DashboardIgreja() {
             <CardTitle className="text-base">Evolução das Ofertas</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={180}>
+            <div className="chart-container h-[180px] sm:h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ofertasMensais}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="mes" tick={{ fontSize: 10 }} interval={0} />
@@ -184,6 +189,7 @@ function DashboardIgreja() {
                 <Bar dataKey="valor" fill="hsl(197,94%,39%)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
             <div className="mt-2 flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Total</span>
               <span className="font-semibold">{formatCurrency(totalOfertas)}</span>

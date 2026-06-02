@@ -7,6 +7,7 @@ import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MobileTableWrap } from "@/components/ui/mobile-table-wrap";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchAlunos, fetchTurmas } from "@/lib/portalApi";
 import { formatDate } from "@/lib/formatters";
@@ -155,6 +156,7 @@ export default function TurmaDetalhe() {
           {alunosDaTurma.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum aluno cadastrado nesta turma.</p>
           ) : (
+            <MobileTableWrap minWidthClass="min-w-[36rem]">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -179,6 +181,7 @@ export default function TurmaDetalhe() {
                 ))}
               </TableBody>
             </Table>
+            </MobileTableWrap>
           )}
         </CardContent>
       </Card>

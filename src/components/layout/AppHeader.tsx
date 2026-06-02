@@ -92,7 +92,7 @@ export function AppHeader() {
   const breadcrumbs = getBreadcrumbs(location.pathname, licoesNavOptions);
 
   return (
-    <header className="z-30 flex min-h-14 shrink-0 items-center gap-2 border-b bg-card px-3 py-2 md:px-4 md:py-0">
+    <header className="safe-area-top z-30 flex min-h-14 shrink-0 items-center gap-2 border-b bg-card px-3 py-2 md:px-4 md:py-0">
       <Button
         variant="ghost"
         size="icon"

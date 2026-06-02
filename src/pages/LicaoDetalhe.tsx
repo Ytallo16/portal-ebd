@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MobileTableWrap } from "@/components/ui/mobile-table-wrap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,42 +100,19 @@ export default function LicaoDetalhe() {
   const ano = Number(anoParam);
   const trimestre = Number(trimestreParam);
   const numeroLicao = Number(licaoNumeroParam);
+  const paramsInvalid =
+    !Number.isFinite(ano) || !Number.isFinite(trimestre) || !Number.isFinite(numeroLicao);
+  const visaoSecretario = !isProfessor && !paramsInvalid;
 
-  if (!Number.isFinite(ano) || !Number.isFinite(trimestre) || !Number.isFinite(numeroLicao)) {
-    return <Navigate to="/licoes" replace />;
-  }
-
-  if (isProfessor && loadingUsuario) {
-    return <p className="text-sm text-muted-foreground">Carregando...</p>;
-  }
-
-  if (isProfessor) {
-    const registroPath = licoesRegistroTurmaProfessorPath(
-      ano,
-      trimestre,
-      numeroLicao,
-      turmasProfessor,
-    );
-    if (registroPath) {
-      return <Navigate to={registroPath} replace />;
-    }
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Nenhuma turma vinculada ao seu usuário. Peça à secretaria para associá-lo como professor
-          de uma turma.
-        </p>
-        <Button variant="outline" onClick={() => navigate(licoesTrimestrePath(ano, trimestre))}>
-          Voltar ao trimestre
-        </Button>
-      </div>
-    );
-  }
+  const professorRegistroPath = useMemo(() => {
+    if (!isProfessor || paramsInvalid) return null;
+    return licoesRegistroTurmaProfessorPath(ano, trimestre, numeroLicao, turmasProfessor);
+  }, [isProfessor, paramsInvalid, ano, trimestre, numeroLicao, turmasProfessor]);
 
   const { data: licoes = [], isLoading: loadingLicao } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "licoes", trimestre, ano),
     queryFn: () => fetchLicoes({ trimestre, ano }),
-    enabled: podeCarregarOperacional,
+    enabled: podeCarregarOperacional && visaoSecretario,
   });
 
   const licao = licoes.find((l) => l.numero === numeroLicao);
@@ -149,13 +127,13 @@ export default function LicaoDetalhe() {
   const { data: turmas = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "turmas"),
     queryFn: fetchTurmas,
-    enabled: podeCarregarOperacional,
+    enabled: podeCarregarOperacional && visaoSecretario,
   });
 
   const { data: sheets = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "attendance-sheets"),
     queryFn: fetchAttendanceSheets,
-    enabled: podeCarregarOperacional,
+    enabled: podeCarregarOperacional && visaoSecretario,
   });
 
   const podeEscalarProfessores =
@@ -164,7 +142,7 @@ export default function LicaoDetalhe() {
   const { data: escalas = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "lesson-schedules", lessonId),
     queryFn: () => fetchLessonSchedules({ lessonId: lessonId! }),
-    enabled: podeCarregarOperacional && Boolean(lessonId),
+    enabled: podeCarregarOperacional && visaoSecretario && Boolean(lessonId),
   });
 
   useEffect(() => {
@@ -297,6 +275,32 @@ export default function LicaoDetalhe() {
     onError: () => toast.error("Não foi possível criar a lição."),
   });
 
+  if (paramsInvalid) {
+    return <Navigate to="/licoes" replace />;
+  }
+
+  if (isProfessor && loadingUsuario) {
+    return <p className="text-sm text-muted-foreground">Carregando...</p>;
+  }
+
+  if (professorRegistroPath) {
+    return <Navigate to={professorRegistroPath} replace />;
+  }
+
+  if (isProfessor) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Nenhuma turma vinculada ao seu usuário. Peça à secretaria para associá-lo como professor
+          de uma turma.
+        </p>
+        <Button variant="outline" onClick={() => navigate(licoesTrimestrePath(ano, trimestre))}>
+          Voltar ao trimestre
+        </Button>
+      </div>
+    );
+  }
+
   if (loadingLicao) {
     return <p className="text-sm text-muted-foreground">Carregando lição...</p>;
   }
@@ -410,7 +414,8 @@ export default function LicaoDetalhe() {
             {chamadaPorClasse.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma chamada registrada ainda.</p>
             ) : (
-              <ResponsiveContainer width="100%" height={250}>
+              <div className="chart-container h-[220px] sm:h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chamadaPorClasse} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -420,6 +425,7 @@ export default function LicaoDetalhe() {
                   <Bar dataKey="ausentes" fill="hsl(0,72%,51%)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -546,7 +552,8 @@ export default function LicaoDetalhe() {
             </p>
           )}
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
+          <MobileTableWrap minWidthClass="min-w-[40rem]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
@@ -591,6 +598,7 @@ export default function LicaoDetalhe() {
               })}
             </tbody>
           </table>
+          </MobileTableWrap>
         </CardContent>
       </Card>
 

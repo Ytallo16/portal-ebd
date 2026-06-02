@@ -109,7 +109,7 @@ export function ProtectedRoute() {
         return <Navigate to="/configuracoes" replace />;
       }
       if (!podeConfiguracoes) {
-        return <Outlet />;
+        return <Navigate to="/" replace />;
       }
     }
   }

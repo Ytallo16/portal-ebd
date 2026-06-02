@@ -35,7 +35,7 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-[100dvh] bg-background safe-area-top safe-area-bottom">
       {/* Textura leve */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.15]"
@@ -47,7 +47,7 @@ export default function Login() {
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/90 via-transparent to-background/70" />
 
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-5 py-12">
+      <div className="relative flex min-h-[100dvh] flex-col items-center justify-center px-4 py-8 sm:px-5 sm:py-12">
         <div className="w-full max-w-[380px] animate-fade-in">
           {/* Marca */}
           <div className="mb-10 text-center">

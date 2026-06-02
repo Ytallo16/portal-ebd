@@ -104,15 +104,41 @@
   * {
     @apply border-border;
   }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100dvh;
   }
 }
 
 @layer utilities {
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .chart-container {
+    @apply h-[200px] w-full min-w-0 sm:h-[220px];
+  }
+
+  .page-title {
+    @apply text-xl font-bold sm:text-2xl;
   }
 }
 

@@ -172,7 +172,8 @@ export default function DashboardProfessor() {
             {evolucaoChart.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhum registro no trimestre ainda.</p>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
+              <div className="chart-container">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={evolucaoChart}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} />
@@ -187,6 +188,7 @@ export default function DashboardProfessor() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MobileTableWrap } from "@/components/ui/mobile-table-wrap";
 import {
   Dialog,
   DialogContent,
@@ -220,10 +221,11 @@ export default function OrganizacaoDetalhe() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Igrejas do campo</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent>
             {igrejas.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma igreja cadastrada neste campo.</p>
             ) : (
+              <MobileTableWrap minWidthClass="min-w-[32rem]">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -248,6 +250,7 @@ export default function OrganizacaoDetalhe() {
                   ))}
                 </TableBody>
               </Table>
+              </MobileTableWrap>
             )}
           </CardContent>
         </Card>
