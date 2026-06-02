@@ -1678,3 +1678,71 @@ export const attendanceApi = {
 export const rankingApi = {
   fetchProfessorRanking,
 };
+
+export type NotificationKind =
+  | "ATTENDANCE_PENDING"
+  | "LESSON_TODAY"
+  | "LESSON_FINALIZE"
+  | "MAGAZINE_PAYMENT"
+  | "BIRTHDAY_TODAY";
+
+export type PortalNotification = {
+  id: number;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  actionPath: string;
+  severity: "info" | "warning";
+  metadata: Record<string, unknown>;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type NotificationsListResponse = {
+  results: PortalNotification[];
+  unreadCount: number;
+};
+
+function mapNotification(item: Record<string, unknown>): PortalNotification {
+  return {
+    id: Number(item.id),
+    kind: item.kind as NotificationKind,
+    title: String(item.title ?? ""),
+    body: String(item.body ?? ""),
+    actionPath: String(item.action_path ?? "/"),
+    severity: (item.severity === "warning" ? "warning" : "info") as "info" | "warning",
+    metadata: (item.metadata as Record<string, unknown>) ?? {},
+    read: Boolean(item.read),
+    readAt: item.read_at ? String(item.read_at) : null,
+    createdAt: String(item.created_at ?? ""),
+  };
+}
+
+export async function fetchNotifications(sync = true): Promise<NotificationsListResponse> {
+  const params = new URLSearchParams({ sync: sync ? "1" : "0" });
+  const data = await request<Record<string, unknown>>(`/notifications/?${params.toString()}`);
+  const results = Array.isArray(data.results) ? data.results : [];
+  return {
+    results: results.map((item) => mapNotification(item as Record<string, unknown>)),
+    unreadCount: Number(data.unread_count ?? 0),
+  };
+}
+
+export async function markNotificationRead(id: number): Promise<NotificationsListResponse> {
+  const data = await request<Record<string, unknown>>(`/notifications/${id}/read/`, {
+    method: "PATCH",
+  });
+  const notification = data.notification as Record<string, unknown> | undefined;
+  return {
+    results: notification ? [mapNotification(notification)] : [],
+    unreadCount: Number(data.unread_count ?? 0),
+  };
+}
+
+export async function markAllNotificationsRead(): Promise<{ unreadCount: number }> {
+  const data = await request<Record<string, unknown>>("/notifications/read-all/", {
+    method: "POST",
+  });
+  return { unreadCount: Number(data.unread_count ?? 0) };
+}

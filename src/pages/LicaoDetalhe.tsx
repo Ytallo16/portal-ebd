@@ -239,8 +239,6 @@ export default function LicaoDetalhe() {
     });
   }, [lessonId, turmasBase, sheets, escalaPorTurma]);
 
-  const primeiraTurmaPendente = turmasComChamada.find((t) => t.status === "nao_iniciada");
-
   const todasTurmasComRegistro =
     turmasComChamada.length > 0 && turmasComChamada.every((t) => t.sheet);
 
@@ -336,18 +334,6 @@ export default function LicaoDetalhe() {
           >
             Frequência dos professores
           </Button>
-          {primeiraTurmaPendente && !lessonFinalizada && !bloqueadoSemData && (
-            <Button
-              variant="outline"
-              onClick={() =>
-                navigate(
-                  licoesTurmaPath(ano, trimestre, numeroLicao, primeiraTurmaPendente.turmaId),
-                )
-              }
-            >
-              {isProfessor ? "Registrar minha EBD" : "Registrar Aula"}
-            </Button>
-          )}
           {podeFinalizarLicao && (
             <Button onClick={() => setConfirmFinalize(true)}>Finalizar lição</Button>
           )}

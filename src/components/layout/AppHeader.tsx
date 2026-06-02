@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { Moon, Sun, Bell, PanelLeft } from "lucide-react";
+import { Moon, Sun, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
@@ -20,6 +20,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/hooks/useTheme";
 import { usePermissions } from "@/auth/usePermissions";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { OrgContextSwitcher } from "@/components/layout/OrgContextSwitcher";
 import { getLicoesBreadcrumbs, getLicoesPageTitle } from "@/components/layout/licoesBreadcrumbs";
 import { isSomenteProfessor } from "@/lib/chamada";
@@ -131,24 +132,32 @@ export function AppHeader() {
         {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
       </Button>
 
-      <Button variant="ghost" size="icon" className="touch-target relative">
-        <Bell className="h-5 w-5" />
-        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-      </Button>
+      <NotificationBell />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="touch-target flex items-center gap-2 px-2">
+          <Button variant="ghost" className="touch-target h-auto max-w-[180px] gap-2 px-2 py-1.5 lg:max-w-[220px]">
             <UserAvatar
               nome={usuarioLogado?.nome ?? "Usuário"}
               fotoUrl={usuarioLogado?.fotoUrl}
-              className="h-8 w-8"
+              className="h-8 w-8 shrink-0"
               fallbackClassName="text-xs"
             />
-            <span className="hidden text-sm font-medium md:inline">{usuarioLogado?.nome.split(" ")[0] ?? "Usuário"}</span>
+            <div className="hidden min-w-0 text-left md:block">
+              <p className="truncate text-sm font-medium leading-tight">
+                {usuarioLogado?.nome.split(" ")[0] ?? "Usuário"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground leading-tight">
+                {usuarioLogado?.papel ?? "Usuário"}
+              </p>
+            </div>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-56">
+          <div className="border-b px-2 py-2 md:hidden">
+            <p className="truncate text-sm font-medium">{usuarioLogado?.nome ?? "Usuário"}</p>
+            <p className="truncate text-xs text-muted-foreground">{usuarioLogado?.papel ?? "Usuário"}</p>
+          </div>
           <DropdownMenuItem onClick={() => navigate("/meu-perfil")}>Meu Perfil</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
