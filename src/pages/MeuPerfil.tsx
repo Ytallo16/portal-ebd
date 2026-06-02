@@ -9,17 +9,13 @@ import {
   Loader2,
   Mail,
   ShieldCheck,
-  Trash2,
-  Upload,
   UserRound,
-  X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PerfilSkeleton } from "@/components/skeletons";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -58,8 +54,6 @@ export default function MeuPerfil() {
   const { data: usuarioLogado, isLoading } = useQuery({ queryKey: ["me"], queryFn: fetchUsuarioLogado });
 
   const [nome, setNome] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -69,16 +63,6 @@ export default function MeuPerfil() {
       setNome(usuarioLogado.nome);
     }
   }, [usuarioLogado]);
-
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-    const objectUrl = URL.createObjectURL(selectedFile);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [selectedFile]);
 
   const invalidateMe = () => {
     queryClient.invalidateQueries({ queryKey: ["me"] });
@@ -97,7 +81,6 @@ export default function MeuPerfil() {
     mutationFn: (file: File) => uploadFotoPerfil(file),
     onSuccess: () => {
       toast.success("Foto de perfil atualizada.");
-      setSelectedFile(null);
       invalidateMe();
     },
     onError: (error) => toast.error(getErrorMessage(error, "Não foi possível enviar a foto.")),
@@ -107,7 +90,6 @@ export default function MeuPerfil() {
     mutationFn: () => removeFotoPerfil(),
     onSuccess: () => {
       toast.success("Foto de perfil removida.");
-      setSelectedFile(null);
       invalidateMe();
     },
     onError: (error) => toast.error(getErrorMessage(error, "Não foi possível remover a foto.")),
@@ -133,10 +115,9 @@ export default function MeuPerfil() {
     return <PerfilSkeleton />;
   }
 
-  const fotoExibida = previewUrl ?? usuarioLogado.fotoUrl;
   const nomeAlterado = nome.trim() !== usuarioLogado.nome;
-  const fotoEmEdicao = Boolean(selectedFile);
   const isAtivo = usuarioLogado.status === "Ativo";
+  const enviandoFoto = uploadFotoMutation.isPending || removeFotoMutation.isPending;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -149,7 +130,7 @@ export default function MeuPerfil() {
       return;
     }
 
-    setSelectedFile(file);
+    uploadFotoMutation.mutate(file);
   };
 
   const handleSalvarNome = () => {
@@ -159,11 +140,6 @@ export default function MeuPerfil() {
       return;
     }
     updateNomeMutation.mutate();
-  };
-
-  const handleSalvarFoto = () => {
-    if (!selectedFile) return;
-    uploadFotoMutation.mutate(selectedFile);
   };
 
   const handleAlterarSenha = () => {
@@ -191,28 +167,45 @@ export default function MeuPerfil() {
         <div className="h-32 bg-gradient-to-br from-primary/25 via-primary/10 to-transparent" />
         <CardContent className="relative px-6 pb-6 pt-0">
           <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-end">
-            <div className="relative -mt-14 shrink-0">
-              <UserAvatar
-                nome={usuarioLogado.nome}
-                fotoUrl={fotoExibida}
-                className="h-28 w-28 ring-4 ring-background shadow-md"
-                fallbackClassName="text-3xl"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-background transition-transform hover:scale-105"
-                title="Alterar foto"
-              >
-                <Camera className="h-4 w-4" />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handleFileChange}
-              />
+            <div className="-mt-14 flex shrink-0 flex-col items-center gap-2">
+              <div className="relative">
+                <UserAvatar
+                  nome={usuarioLogado.nome}
+                  fotoUrl={usuarioLogado.fotoUrl}
+                  className="h-28 w-28 ring-4 ring-background shadow-md"
+                  fallbackClassName="text-3xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={enviandoFoto}
+                  className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-background transition-transform hover:scale-105 disabled:opacity-70"
+                  title="Alterar foto (JPEG, PNG ou WebP — máx. 5 MB)"
+                >
+                  {uploadFotoMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
+              {usuarioLogado.fotoUrl ? (
+                <button
+                  type="button"
+                  className="text-xs text-destructive hover:underline disabled:opacity-60"
+                  onClick={() => removeFotoMutation.mutate()}
+                  disabled={enviandoFoto}
+                >
+                  {removeFotoMutation.isPending ? "Removendo…" : "Remover foto"}
+                </button>
+              ) : null}
             </div>
 
             <div className="min-w-0 flex-1 text-center sm:pb-1 sm:text-left">
@@ -245,37 +238,6 @@ export default function MeuPerfil() {
             </div>
           ) : null}
 
-          {fotoEmEdicao ? (
-            <div className="mt-4 flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Nova foto selecionada</p>
-                <p className="truncate text-xs text-muted-foreground">{selectedFile?.name}</p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSelectedFile(null)}
-                  disabled={uploadFotoMutation.isPending}
-                >
-                  <X className="mr-1.5 h-3.5 w-3.5" />
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSalvarFoto}
-                  disabled={uploadFotoMutation.isPending}
-                >
-                  {uploadFotoMutation.isPending ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  Salvar foto
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -351,53 +313,6 @@ export default function MeuPerfil() {
                     )}
                   </Button>
                 </div>
-              </div>
-
-              <Separator className="my-8" />
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold">Foto de perfil</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    JPEG, PNG ou WebP — máximo 5 MB.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="group flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/20 px-6 py-8 transition-colors hover:border-primary/40 hover:bg-primary/5"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-border transition-transform group-hover:scale-105">
-                    <Upload className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium">Clique para escolher uma foto</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      ou use o ícone de câmera no avatar acima
-                    </p>
-                  </div>
-                </button>
-
-                {usuarioLogado.fotoUrl && !fotoEmEdicao ? (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => removeFotoMutation.mutate()}
-                      disabled={removeFotoMutation.isPending}
-                    >
-                      {removeFotoMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="mr-2 h-4 w-4" />
-                      )}
-                      Remover foto atual
-                    </Button>
-                  </div>
-                ) : null}
               </div>
             </TabsContent>
 
