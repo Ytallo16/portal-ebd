@@ -35,17 +35,17 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#f4f6f8]">
+    <div className="relative min-h-screen bg-background">
       {/* Textura leve */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.4]"
+        className="pointer-events-none absolute inset-0 opacity-[0.35] dark:opacity-[0.15]"
         style={{
           backgroundImage:
             "linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/80 via-transparent to-white/60" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/90 via-transparent to-background/70" />
 
       <div className="relative flex min-h-screen flex-col items-center justify-center px-5 py-12">
         <div className="w-full max-w-[380px] animate-fade-in">
@@ -58,11 +58,10 @@ export default function Login() {
               EBD
             </h1>
             <div className="mx-auto mt-4 h-0.5 w-10 rounded-full bg-primary" />
-            
           </div>
 
           {/* Formulário */}
-          <div className="rounded-2xl border border-border/60 bg-card p-7 shadow-[0_8px_30px_rgb(0,0,0,0.06)] sm:p-8">
+          <div className="rounded-2xl border border-border/60 bg-card p-7 shadow-[0_8px_30px_rgb(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] sm:p-8">
             <p className="mb-6 text-sm font-medium text-foreground">Acesse sua conta</p>
 
             <form className="space-y-5" onSubmit={handleSubmit} noValidate>

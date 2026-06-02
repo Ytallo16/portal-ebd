@@ -1174,7 +1174,7 @@ export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
   return {
     nome: me.nome,
     email: me.email,
-    fotoUrl: me.foto_url ?? null,
+    fotoUrl: me.foto_url?.trim() ? me.foto_url : null,
     papel: formatPapelLabel(papelPrincipal),
     papeis,
     status: me.is_active ? "Ativo" : "Inativo",
