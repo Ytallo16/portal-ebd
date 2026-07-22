@@ -29,6 +29,7 @@ function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boo
   if (matchPath("/turmas/:id/licoes", pathname)) return "Lições";
   if (matchPath("/turmas/:id", pathname)) return "Turma";
   if (matchPath("/alunos", pathname)) return "Matriculados";
+  if (matchPath("/professores", pathname)) return "Professores";
   if (matchPath("/financeiro", pathname)) return "Financeiro";
   if (matchPath("/revistas", pathname)) return "Revistas";
   if (matchPath("/igrejas", pathname)) return "Igrejas";
@@ -60,6 +61,7 @@ function getBreadcrumbs(pathname: string, licoesOptions?: { somenteProfessor?: b
     ];
   }
   if (matchPath("/alunos", pathname)) return [{ label: "Matriculados" }];
+  if (matchPath("/professores", pathname)) return [{ label: "Professores" }];
   if (matchPath("/financeiro", pathname)) return [{ label: "Financeiro" }];
   if (matchPath("/revistas", pathname)) return [{ label: "Revistas" }];
   if (matchPath("/igrejas", pathname)) return [{ label: "Igrejas" }];

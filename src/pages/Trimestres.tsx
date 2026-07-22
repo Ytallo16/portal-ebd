@@ -10,6 +10,7 @@ import { MobileTableWrap } from "@/components/ui/mobile-table-wrap";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarRange, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { formatDate } from "@/lib/formatters";
 import { licoesTrimestrePath } from "@/lib/licoesRoutes";
 import { TrimestresPageSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
@@ -181,7 +182,10 @@ export default function Trimestres() {
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </span>
                     </TableCell>
-                    <TableCell>{item.dataInicio || "—"} até {item.dataFim || "—"}</TableCell>
+                    <TableCell>
+                      {item.dataInicio ? formatDate(item.dataInicio) : "—"} até{" "}
+                      {item.dataFim ? formatDate(item.dataFim) : "—"}
+                    </TableCell>
                     <TableCell>{item.quantidadeLicoes}</TableCell>
                     <TableCell>
                       <Badge variant={item.status === "ENCERRADO" ? "secondary" : item.status === "EM_ANDAMENTO" ? "default" : "outline"}>

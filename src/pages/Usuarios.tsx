@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { KeyRound, Pencil, Plus, Search, Users, UserCheck, UserX } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -317,6 +317,7 @@ export default function Usuarios() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo usuário</DialogTitle>
+            <DialogDescription>Informe os dados e o perfil de acesso do novo usuário.</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={onSubmitCreate}>
             <div>
@@ -401,6 +402,7 @@ export default function Usuarios() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar usuário</DialogTitle>
+            <DialogDescription>Atualize os dados e o status de acesso do usuário.</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={onSubmitEdit}>
             <div>
