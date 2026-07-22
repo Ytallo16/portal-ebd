@@ -78,10 +78,13 @@ function NotificationItem({
 
 export function NotificationBell() {
   const navigate = useNavigate();
-  const { podeCarregarOperacional } = usePermissions();
+  const { organizacaoAtiva } = usePermissions();
+  // Mostra o sino sempre que houver contexto ativo (igreja OU campo). No campo,
+  // o backend agrega as notificações de todas as igrejas do campo.
+  const podeVerNotificacoes = Boolean(organizacaoAtiva);
   const [open, setOpen] = useState(false);
   const { notifications, unreadCount, isLoading, isError, readOne, readAll, refresh } =
-    useNotifications(podeCarregarOperacional);
+    useNotifications(podeVerNotificacoes);
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -98,7 +101,7 @@ export function NotificationBell() {
     }
   };
 
-  if (!podeCarregarOperacional) {
+  if (!podeVerNotificacoes) {
     return null;
   }
 

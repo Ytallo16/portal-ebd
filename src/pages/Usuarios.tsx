@@ -88,7 +88,10 @@ export default function Usuarios() {
 
   const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
   const { isAdminSistema, can, hasRole, contextoCampo, contextoIgreja, organizacaoAtiva } = usePermissions();
-  const podeCriarUsuario = can("usuarios", "criar");
+  // Admin do sistema pode criar usuários mesmo sem contexto ativo (ex.: criar outro
+  // master). O backend já permite ADMINISTRADOR sem organização; sem contexto, o
+  // seletor de papéis oferece apenas "Administrador do sistema".
+  const podeCriarUsuario = can("usuarios", "criar") || isAdminSistema;
 
   const papeisDisponiveis = useMemo(
     () => getCreateRoleOptions(isAdminSistema, hasRole),
