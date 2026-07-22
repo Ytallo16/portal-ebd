@@ -17,6 +17,7 @@ import {
   trimestreLabel,
 } from "@/lib/licoesRoutes";
 import { fetchLicoes, fetchTrimestres, type Trimestre } from "@/lib/portalApi";
+import { formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 const statusTrimestreLabel: Record<Trimestre["status"], string> = {
@@ -201,7 +202,8 @@ function TrimestreCard({
             {statusTrimestreLabel[trimestre.status]}
           </Badge>
           <p className="text-xs text-muted-foreground">
-            {trimestre.dataInicio || "—"} até {trimestre.dataFim || "—"}
+            {trimestre.dataInicio ? formatDate(trimestre.dataInicio) : "—"} até{" "}
+            {trimestre.dataFim ? formatDate(trimestre.dataFim) : "—"}
           </p>
         </div>
         <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />

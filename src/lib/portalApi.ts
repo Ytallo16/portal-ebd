@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ApiError, getResults, request } from "@/lib/api";
+import { ApiError, getResults, request, requestAllPages } from "@/lib/api";
 import { formatDate } from "@/lib/formatters";
 import { formatPapelLabel } from "@/lib/roleLabels";
 
@@ -433,8 +433,7 @@ function mapAluno(item: any): Aluno {
 
 export async function fetchAlunos(search = ""): Promise<Aluno[]> {
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
-  const data = await request<unknown>(`/students/${query}`);
-  const items = getResults<any>(data);
+  const items = await requestAllPages<any>(`/students/${query}`);
   return items.map(mapAluno);
 }
 

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
@@ -21,6 +21,9 @@ import { createTurma, fetchTurmas } from "@/lib/portalApi";
 import { CardGridSkeleton, PageHeaderSkeleton } from "@/components/skeletons";
 import { toast } from "sonner";
 
+// Faixa padrão pré-preenchida ao criar turma, evitando confusão com o placeholder.
+const FAIXA_ETARIA_PADRAO: FaixaEtariaFormValue = { ...FAIXA_ETARIA_VAZIA, idadeMin: "6", idadeMax: "12" };
+
 export default function Turmas() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -36,7 +39,7 @@ export default function Turmas() {
   const [form, setForm] = useState({
     nome: "",
     cor: "#3B82F6",
-    faixa: { ...FAIXA_ETARIA_VAZIA },
+    faixa: { ...FAIXA_ETARIA_PADRAO },
   });
   const [faixaErro, setFaixaErro] = useState<string | null>(null);
   const createMutation = useMutation({
@@ -129,6 +132,7 @@ export default function Turmas() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Nova Turma</DialogTitle>
+            <DialogDescription>Defina o nome, a faixa etária e a cor da turma.</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div>

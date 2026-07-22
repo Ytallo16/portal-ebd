@@ -15,7 +15,8 @@ export function getLicoesBreadcrumbs(
     return [...base, { label: "Gerenciar trimestres" }];
   }
 
-  const trimestreMatch = matchPath({ path: "/licoes/:ano/:trimestre", end: true }, pathname);
+  // end:false para casar também as rotas filhas (lição, chamada, frequência).
+  const trimestreMatch = matchPath({ path: "/licoes/:ano/:trimestre", end: false }, pathname);
   if (trimestreMatch?.params.ano && trimestreMatch.params.trimestre) {
     const ano = Number(trimestreMatch.params.ano);
     const tri = Number(trimestreMatch.params.trimestre);

@@ -12,13 +12,27 @@ const LEGACY_ROLE_ALIASES: Record<string, string> = {
   SECRETARIA: "SECRETARIO_IGREJA",
   ADMIN_IGREJA: "SECRETARIO_IGREJA",
   "SECRETÁRIO DE IGREJA": "SECRETARIO_IGREJA",
+  // Variantes que chegam já como texto de exibição (com "de"/"do"), para não
+  // caírem no fallback e virarem "Secretário De Campo" / "Administrador Do Sistema".
+  ADMINISTRADOR_DO_SISTEMA: "ADMINISTRADOR",
+  "ADMINISTRADOR DO SISTEMA": "ADMINISTRADOR",
+  SECRETARIO_DE_CAMPO: "SECRETARIO_CAMPO",
+  "SECRETÁRIO DE CAMPO": "SECRETARIO_CAMPO",
+  SECRETARIO_DE_IGREJA: "SECRETARIO_IGREJA",
 };
+
+// Conectores que devem permanecer em minúsculo em nomes de papéis.
+const CONECTORES = new Set(["de", "do", "da", "dos", "das", "e"]);
 
 function humanizePapelFallback(key: string): string {
   return key
     .split(/[_\s]+/)
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word, index) => {
+      const lower = word.toLowerCase();
+      if (index > 0 && CONECTORES.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
     .join(" ");
 }
 

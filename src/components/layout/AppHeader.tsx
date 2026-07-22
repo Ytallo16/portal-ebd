@@ -3,12 +3,6 @@ import { Moon, Sun, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
@@ -110,7 +104,7 @@ export function AppHeader() {
         <PanelLeft className="h-4 w-4" />
       </Button>
 
-      <div className="min-w-0 flex-1 overflow-hidden md:flex-none md:overflow-visible">
+      <div className="min-w-0 flex-1 overflow-hidden md:overflow-visible">
         <h1
           className="truncate text-sm font-semibold leading-tight md:hidden"
           title={pageTitle}
@@ -148,33 +142,27 @@ export function AppHeader() {
 
         <NotificationBell />
 
-        <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="touch-target h-auto shrink-0 gap-2 px-1.5 py-1.5 sm:px-2">
-            <UserAvatar
-              nome={usuarioLogado?.nome ?? "Usuário"}
-              fotoUrl={usuarioLogado?.fotoUrl}
-              className="h-8 w-8 shrink-0"
-              fallbackClassName="text-xs"
-            />
-            <div className="hidden min-w-0 text-left md:block">
-              <p className="truncate text-sm font-medium leading-tight">
-                {usuarioLogado?.nome.split(" ")[0] ?? "Usuário"}
-              </p>
-              <p className="truncate text-xs text-muted-foreground leading-tight">
-                {usuarioLogado?.papel ?? "Usuário"}
-              </p>
-            </div>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <div className="border-b px-2 py-2 md:hidden">
-            <p className="truncate text-sm font-medium">{usuarioLogado?.nome ?? "Usuário"}</p>
-            <p className="truncate text-xs text-muted-foreground">{usuarioLogado?.papel ?? "Usuário"}</p>
+        <Button
+          variant="ghost"
+          className="touch-target h-auto shrink-0 gap-2 px-1.5 py-1.5 sm:px-2"
+          onClick={() => navigate("/meu-perfil")}
+          aria-label="Meu Perfil"
+        >
+          <UserAvatar
+            nome={usuarioLogado?.nome ?? "Usuário"}
+            fotoUrl={usuarioLogado?.fotoUrl}
+            className="h-8 w-8 shrink-0"
+            fallbackClassName="text-xs"
+          />
+          <div className="hidden min-w-0 text-left md:block">
+            <p className="truncate text-sm font-medium leading-tight">
+              {usuarioLogado?.nome.split(" ")[0] ?? "Usuário"}
+            </p>
+            <p className="truncate text-xs text-muted-foreground leading-tight">
+              {usuarioLogado?.papel ?? "Usuário"}
+            </p>
           </div>
-          <DropdownMenuItem onClick={() => navigate("/meu-perfil")}>Meu Perfil</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </Button>
       </div>
     </header>
   );

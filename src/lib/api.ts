@@ -188,12 +188,30 @@ function pickOperationalOrganizationId(me: {
   return null;
 }
 
+let hydrationPromise: Promise<void> | null = null;
+
 /** Restaura contexto salvo (local + servidor) uma vez por sessão de página. */
 export async function hydrateOrganizationContext(force = false) {
   if (contextHydrated && !force) {
     return;
   }
 
+  // Deduplica hidratações concorrentes no carregamento inicial: evita várias
+  // chamadas simultâneas a /me quando vários requests disparam ao mesmo tempo.
+  if (!force && hydrationPromise) {
+    return hydrationPromise;
+  }
+
+  const promise = doHydrateOrganizationContext();
+  if (!force) hydrationPromise = promise;
+  try {
+    await promise;
+  } finally {
+    if (hydrationPromise === promise) hydrationPromise = null;
+  }
+}
+
+async function doHydrateOrganizationContext() {
   try {
     const me = await request<any>(
       "/me",
@@ -315,4 +333,36 @@ export async function request<T = unknown>(
   }
 
   return (await response.json()) as T;
+}
+
+/**
+ * Executa uma requisição GET paginada (DRF PageNumberPagination) e retorna
+ * TODOS os resultados, seguindo o campo `next` até o fim. Evita que listas
+ * grandes (ex.: alunos) fiquem limitadas à primeira página.
+ */
+export async function requestAllPages<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+  options: { ensureOrganization?: boolean; skipOrganizationHeader?: boolean } = {},
+): Promise<T[]> {
+  const [basePath, existingQuery = ""] = path.split("?");
+  const params = new URLSearchParams(existingQuery);
+  const all: T[] = [];
+  let page = 1;
+
+  // Limite de segurança para não correr risco de laço infinito.
+  for (let guard = 0; guard < 500; guard += 1) {
+    params.set("page", String(page));
+    const data = await request<unknown>(`${basePath}?${params.toString()}`, init, options);
+    all.push(...getResults<T>(data));
+
+    const next =
+      data && typeof data === "object" && "next" in data
+        ? (data as { next?: unknown }).next
+        : null;
+    if (!next) break;
+    page += 1;
+  }
+
+  return all;
 }
