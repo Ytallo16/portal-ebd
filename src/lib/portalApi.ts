@@ -17,6 +17,7 @@ export type Turma = {
   professorUsers: TurmaProfessor[];
   totalAlunos: number;
   cor: string;
+  ativa: boolean;
 };
 
 export type MatriculadoTipo = "ALUNO" | "PROFESSOR";
@@ -254,7 +255,10 @@ export type Usuario = {
   id: string;
   nome: string;
   email: string;
+  /** Rótulo exibível, já traduzido por `formatPapelLabel`. */
   papel: string;
+  /** Valor canônico do papel (ex.: "PROFESSOR"), usado nos formulários. */
+  papelRaw: string;
   status: "Ativo" | "Inativo";
 };
 
@@ -364,19 +368,32 @@ export async function fetchTurmas(): Promise<Turma[]> {
     })),
     totalAlunos: item.total_alunos ?? 0,
     cor: item.cor ?? "#3B82F6",
+    ativa: item.ativa ?? true,
   }));
 }
 
-export async function createTurma(payload: { nome: string; faixaEtaria: string; cor: string }) {
-  return request("/classes/", {
-    method: "POST",
-    body: JSON.stringify({
-      nome: payload.nome,
-      faixa_etaria: payload.faixaEtaria,
-      cor: payload.cor,
-      ativa: true,
-    }),
+export type TurmaPayload = {
+  nome: string;
+  faixaEtaria: string;
+  cor: string;
+  ativa: boolean;
+};
+
+function toTurmaBody(payload: TurmaPayload) {
+  return JSON.stringify({
+    nome: payload.nome,
+    faixa_etaria: payload.faixaEtaria,
+    cor: payload.cor,
+    ativa: payload.ativa,
   });
+}
+
+export async function createTurma(payload: TurmaPayload) {
+  return request("/classes/", { method: "POST", body: toTurmaBody(payload) });
+}
+
+export async function updateTurma(id: string, payload: TurmaPayload) {
+  return request(`/classes/${id}/`, { method: "PATCH", body: toTurmaBody(payload) });
 }
 
 export async function fetchProfessoresIgreja(): Promise<Array<{ id: string; nome: string }>> {
@@ -1088,17 +1105,20 @@ export async function updatePublicationControl(
   });
 }
 
-export async function fetchUsuarios(): Promise<Usuario[]> {
-  const data = await request<unknown>("/users/");
-  const items = getResults<any>(data);
-
-  return items.map((item) => ({
+function mapUsuario(item: any): Usuario {
+  return {
     id: String(item.id),
     nome: item.nome,
     email: item.email,
     papel: formatPapelLabel(item.papeis?.[0]),
+    papelRaw: (item.papeis?.[0] ?? "").trim().toUpperCase(),
     status: item.is_active ? "Ativo" : "Inativo",
-  }));
+  };
+}
+
+export async function fetchUsuarios(): Promise<Usuario[]> {
+  const data = await request<unknown>("/users/");
+  return getResults<any>(data).map(mapUsuario);
 }
 
 export async function toggleUserActive(userId: string) {
@@ -1117,13 +1137,7 @@ export async function createUsuario(payload: {
     body: JSON.stringify(payload),
   });
 
-  return {
-    id: String(item.id),
-    nome: item.nome,
-    email: item.email,
-    papel: formatPapelLabel(item.papeis?.[0]),
-    status: item.is_active ? "Ativo" : "Inativo",
-  };
+  return mapUsuario(item);
 }
 
 export async function updateUsuario(
@@ -1132,6 +1146,8 @@ export async function updateUsuario(
     nome: string;
     email: string;
     is_active: boolean;
+    /** Omitido quando o perfil não deve ser alterado. */
+    papel?: string;
   },
 ) {
   return request(`/users/${userId}/`, {
