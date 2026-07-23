@@ -1,17 +1,85 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildPermissionHelpers } from "@/auth/usePermissions";
 import { igrejasDoSecretarioCampo } from "@/lib/orgContextSelection";
 import {
   deveExibirMenuIgrejas,
   deveExibirSeletorIgrejasNoHeader,
+  fetchTurmas,
   isInstanciaCampo,
   isInstanciaIgrejaIndividual,
   isTipoCampo,
   isTipoIgreja,
+  updateTurma,
   type OrganizacaoContexto,
   type UsuarioLogado,
 } from "@/lib/portalApi";
+
+describe("turmas — leitura e edição", () => {
+  const fetchMock = vi.fn();
+
+  function jsonResponse(body: unknown) {
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(body),
+      json: async () => body,
+    } as unknown as Response;
+  }
+
+  beforeEach(() => {
+    localStorage.setItem("portal_ebd_user_email", "sec@test.com");
+    localStorage.setItem("portal_ebd_org_id_sec@test.com", "7");
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it("mapeia o status ativo da turma", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        {
+          id: 3,
+          nome: "Adultos",
+          faixa_etaria: "18+ anos",
+          cor: "#111111",
+          ativa: false,
+          total_alunos: 4,
+          professores: [{ id: 9, user: 2, user_nome: "Ana" }],
+        },
+      ]),
+    );
+
+    const [turma] = await fetchTurmas();
+    expect(turma).toMatchObject({ id: "3", ativa: false, cor: "#111111", totalAlunos: 4 });
+    expect(turma.professorUsers).toEqual([{ id: 2, nome: "Ana", linkId: "9" }]);
+  });
+
+  it("envia PATCH com os campos da turma em snake_case", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ id: 3 }));
+
+    await updateTurma("3", {
+      nome: "Jovens",
+      faixaEtaria: "15 a 17 anos",
+      cor: "#22C55E",
+      ativa: true,
+    });
+
+    const [requestUrl, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(requestUrl).toContain("/classes/3/");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({
+      nome: "Jovens",
+      faixa_etaria: "15 a 17 anos",
+      cor: "#22C55E",
+      ativa: true,
+    });
+  });
+});
 
 describe("buildPermissionHelpers", () => {
   it("identifica admin do sistema e permissões", () => {

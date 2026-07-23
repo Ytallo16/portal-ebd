@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePermissions } from "@/auth/usePermissions";
+import { ApiError } from "@/lib/api";
 import {
   createUsuario,
   fetchUsuarios,
@@ -76,8 +77,10 @@ export default function Usuarios() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingUserEmail, setEditingUserEmail] = useState("");
+  const [papelOriginal, setPapelOriginal] = useState("");
   const [resettingUser, setResettingUser] = useState<Usuario | null>(null);
-  const [editForm, setEditForm] = useState({ nome: "", email: "", isActive: true });
+  const [editForm, setEditForm] = useState({ nome: "", email: "", isActive: true, papel: "" });
   const [createForm, setCreateForm] = useState({
     nome: "",
     email: "",
@@ -87,7 +90,8 @@ export default function Usuarios() {
   });
 
   const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
-  const { isAdminSistema, can, hasRole, contextoCampo, contextoIgreja, organizacaoAtiva } = usePermissions();
+  const { isAdminSistema, can, hasRole, contextoCampo, contextoIgreja, organizacaoAtiva, usuario } =
+    usePermissions();
   // Admin do sistema pode criar usuários mesmo sem contexto ativo (ex.: criar outro
   // master). O backend já permite ADMINISTRADOR sem organização; sem contexto, o
   // seletor de papéis oferece apenas "Administrador do sistema".
@@ -102,6 +106,19 @@ export default function Usuarios() {
     () => papeisAplicaveisNoContexto(papeisDisponiveis, contextoCampo, contextoIgreja),
     [papeisDisponiveis, contextoCampo, contextoIgreja],
   );
+
+  // O backend recusa que alguém altere o próprio perfil, para evitar auto-bloqueio.
+  const editandoASiMesmo =
+    Boolean(editingUserEmail) &&
+    editingUserEmail.toLowerCase() === (usuario?.email ?? "").toLowerCase();
+  // O papel atual entra na lista mesmo fora do contexto para não parecer que o
+  // usuário está sem perfil; ele só não pode ser reatribuído a partir daqui.
+  const papeisParaEdicao = useMemo(() => {
+    const opcoes = [...papeisNoContextoAtual];
+    if (papelOriginal && !opcoes.includes(papelOriginal)) opcoes.unshift(papelOriginal);
+    return opcoes;
+  }, [papeisNoContextoAtual, papelOriginal]);
+  const podeEditarPapel = !editandoASiMesmo && papeisNoContextoAtual.length > 0;
 
   const toggleMutation = useMutation({
     mutationFn: (userId: string) => toggleUserActive(userId),
@@ -125,10 +142,14 @@ export default function Usuarios() {
         nome: editForm.nome,
         email: editForm.email,
         is_active: editForm.isActive,
+        // Só envia o papel quando ele realmente mudou: o backend recusa
+        // trocar o próprio perfil e perfis fora do contexto atual.
+        ...(editForm.papel && editForm.papel !== papelOriginal ? { papel: editForm.papel } : {}),
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["turmas"] });
       setIsEditOpen(false);
       setEditingUserId(null);
     },
@@ -155,17 +176,20 @@ export default function Usuarios() {
 
   function openEditModal(usuario: Usuario) {
     setEditingUserId(usuario.id);
+    setEditingUserEmail(usuario.email);
+    setPapelOriginal(usuario.papelRaw);
     setEditForm({
       nome: usuario.nome,
       email: usuario.email,
       isActive: usuario.status === "Ativo",
+      papel: usuario.papelRaw,
     });
     setIsEditOpen(true);
   }
 
-  async function onSubmitEdit(e: React.FormEvent) {
+  function onSubmitEdit(e: React.FormEvent) {
     e.preventDefault();
-    await editMutation.mutateAsync();
+    editMutation.mutate();
   }
 
   async function onSubmitCreate(e: React.FormEvent) {
@@ -399,6 +423,9 @@ export default function Usuarios() {
           setIsEditOpen(open);
           if (!open) {
             setEditingUserId(null);
+            setEditingUserEmail("");
+            setPapelOriginal("");
+            editMutation.reset();
           }
         }}
       >
@@ -425,6 +452,36 @@ export default function Usuarios() {
                 required
               />
             </div>
+            <div>
+              <Label>Perfil</Label>
+              {podeEditarPapel ? (
+                <Select
+                  value={editForm.papel}
+                  onValueChange={(value) => setEditForm((prev) => ({ ...prev, papel: value }))}
+                >
+                  <SelectTrigger className="touch-target">
+                    <SelectValue placeholder="Selecione o perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {papeisParaEdicao.map((papel) => (
+                      <SelectItem key={papel} value={papel}>
+                        {formatPapelLabel(papel)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatPapelLabel(papelOriginal) || papelOriginal || "—"}
+                  {editandoASiMesmo ? " · você não pode alterar o próprio perfil" : ""}
+                </p>
+              )}
+              {papelOriginal === "PROFESSOR" && editForm.papel !== "PROFESSOR" ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ao sair do perfil Professor, o vínculo com a turma é removido.
+                </p>
+              ) : null}
+            </div>
             <div className="flex items-center justify-between rounded-md border p-3">
               <Label htmlFor="usuario-ativo" className="m-0">
                 Usuário ativo
@@ -435,6 +492,13 @@ export default function Usuarios() {
                 onCheckedChange={(checked) => setEditForm((prev) => ({ ...prev, isActive: checked }))}
               />
             </div>
+            {editMutation.isError ? (
+              <p className="text-sm text-destructive">
+                {editMutation.error instanceof ApiError && editMutation.error.message
+                  ? editMutation.error.message
+                  : "Não foi possível salvar o usuário. Verifique os dados e tente novamente."}
+              </p>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancelar

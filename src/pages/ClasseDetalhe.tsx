@@ -119,6 +119,7 @@ export default function ClasseDetalhe() {
           professorUsers: [],
           totalAlunos: 0,
           cor: "#3B82F6",
+          ativa: true,
         }
       : undefined);
 
