@@ -43,19 +43,18 @@ export default function LicoesHub() {
 
   const trimestreQuery = Number(searchParams.get("trimestre"));
   const anoQuery = Number(searchParams.get("ano"));
-  if (
+  const destinoLegado =
     Number.isFinite(trimestreQuery) &&
     Number.isFinite(anoQuery) &&
     trimestreQuery >= 1 &&
     anoQuery >= 2000
-  ) {
-    return <Navigate to={licoesTrimestrePath(anoQuery, trimestreQuery)} replace />;
-  }
+      ? licoesTrimestrePath(anoQuery, trimestreQuery)
+      : null;
 
   const { data: trimestres = [], isLoading } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "trimestres"),
-    queryFn: fetchTrimestres,
-    enabled: podeCarregarOperacional,
+    queryFn: () => fetchTrimestres(),
+    enabled: podeCarregarOperacional && !destinoLegado,
   });
 
   const trimestreEmAndamento = trimestres.find((t) => t.status === "EM_ANDAMENTO");
@@ -72,7 +71,10 @@ export default function LicoesHub() {
         trimestre: trimestreEmAndamento!.numero,
         ano: trimestreEmAndamento!.ano,
       }),
-    enabled: podeCarregarOperacional && Boolean(trimestreEmAndamento),
+    enabled:
+      podeCarregarOperacional &&
+      !destinoLegado &&
+      Boolean(trimestreEmAndamento),
   });
 
   const licaoDaSemana = useMemo(() => findLicaoDaSemana(licoesAtivas), [licoesAtivas]);
@@ -83,6 +85,10 @@ export default function LicoesHub() {
     outros.sort((a, b) => b.ano - a.ano || b.numero - a.numero);
     return [...emAndamento, ...outros];
   }, [trimestres]);
+
+  if (destinoLegado) {
+    return <Navigate to={destinoLegado} replace />;
+  }
 
   if (isLoading) {
     return <LicoesHubSkeleton />;

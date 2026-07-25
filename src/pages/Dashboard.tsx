@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, DollarSign, UserPlus, CalendarDays } from "lucide-react";
 import { BirthdayDateBadge } from "@/components/dashboard/BirthdayDateBadge";
 import { BirthdayColumns } from "@/components/dashboard/BirthdayColumns";
+import { DashboardActionQueue } from "@/components/dashboard/DashboardActionQueue";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { isSomenteProfessor } from "@/lib/chamada";
 import { DashboardSkeleton } from "@/components/skeletons";
@@ -112,6 +113,8 @@ function DashboardIgreja() {
       <div>
         <p className="text-sm text-muted-foreground capitalize">{dataFormatada}</p>
       </div>
+
+      <DashboardActionQueue />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.map((kpi) => (

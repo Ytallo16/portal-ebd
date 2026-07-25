@@ -29,17 +29,14 @@ import {
   isSomenteProfessor,
   mensagemBloqueioChamada,
   podeEditarChamadaNaTurma,
-  professorPodeRegistrarChamada,
 } from "@/lib/chamada";
 import { formatCurrency, getIniciais } from "@/lib/formatters";
 import {
-  ensureAttendanceSheet,
   fetchAlunos,
   fetchAttendanceByLessonClass,
-  fetchLicoes,
+  fetchLicoesByTurma,
   fetchTurmas,
-  saveAttendanceRecords,
-  updateAttendanceSheet,
+  saveAttendanceRegistration,
 } from "@/lib/portalApi";
 
 type PresencaMap = Record<string, boolean>;
@@ -49,7 +46,7 @@ export default function ClasseDetalhe() {
     ano: anoParam,
     trimestre: trimestreParam,
     licaoNumero: licaoNumeroParam,
-    classId,
+    classId: classIdParam,
   } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -68,6 +65,12 @@ export default function ClasseDetalhe() {
   const ano = Number(anoParam);
   const trimestre = Number(trimestreParam);
   const numeroLicao = Number(licaoNumeroParam);
+  const classId = classIdParam ?? "";
+  const parametrosValidos =
+    Number.isFinite(ano) &&
+    Number.isFinite(trimestre) &&
+    Number.isFinite(numeroLicao) &&
+    Boolean(classId);
 
   const [visitantes, setVisitantes] = useState(0);
   const [biblias, setBiblias] = useState(0);
@@ -75,26 +78,20 @@ export default function ClasseDetalhe() {
   const [ofertaValor, setOfertaValor] = useState("0");
   const [professorId, setProfessorId] = useState<string>("");
   const [presencas, setPresencas] = useState<PresencaMap>({});
+  const [edicaoIniciada, setEdicaoIniciada] = useState(false);
 
-  if (
-    !Number.isFinite(ano) ||
-    !Number.isFinite(trimestre) ||
-    !Number.isFinite(numeroLicao) ||
-    !classId
-  ) {
-    return <Navigate to="/licoes" replace />;
-  }
-
-  const podeEditarFrequencia = can("frequencia", "criar") || can("frequencia", "editar");
+  const podeCriarFrequencia = can("frequencia", "criar");
+  const podeAlterarFrequencia = can("frequencia", "editar");
+  const podeGerenciarFrequencia = podeCriarFrequencia || podeAlterarFrequencia;
   const isProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
   const ensinaEstaTurma = turmasProfessor.some((t) => String(t.id) === classId);
   const voltarPath = () =>
     licoesVoltarDaTurmaPath(ano, trimestre, numeroLicao, isProfessor);
 
   const { data: licoes = [], isLoading: loadingLicoes } = useQuery({
-    queryKey: orgQueryKey(activeOrgId, "licoes", trimestre, ano),
-    queryFn: () => fetchLicoes({ trimestre, ano }),
-    enabled: podeCarregarOperacional,
+    queryKey: orgQueryKey(activeOrgId, "licoes", "turma", classId, trimestre, ano),
+    queryFn: () => fetchLicoesByTurma(classId, trimestre, ano),
+    enabled: podeCarregarOperacional && parametrosValidos,
   });
 
   const licao = licoes.find((l) => l.numero === numeroLicao);
@@ -103,7 +100,7 @@ export default function ClasseDetalhe() {
   const { data: turmas = [], isLoading: loadingTurmas } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "turmas"),
     queryFn: fetchTurmas,
-    enabled: podeCarregarOperacional,
+    enabled: podeCarregarOperacional && parametrosValidos,
   });
 
   const turmaFromProfessor = turmasProfessor.find((t) => String(t.id) === classId);
@@ -130,12 +127,16 @@ export default function ClasseDetalhe() {
   const { data: alunos = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "alunos"),
     queryFn: () => fetchAlunos(),
-    enabled: podeCarregarOperacional,
+    enabled: podeCarregarOperacional && parametrosValidos,
   });
 
   const alunosDaTurma = useMemo(
     () => alunos.filter((a) => a.turmaId === classId),
     [alunos, classId],
+  );
+  const alunosAtivosIds = useMemo(
+    () => new Set(alunos.map((aluno) => aluno.id)),
+    [alunos],
   );
 
   const {
@@ -147,22 +148,14 @@ export default function ClasseDetalhe() {
     refetch: refetchSheet,
   } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "attendance-classe", lessonId, classId),
-    queryFn: async () => {
+    queryFn: () => {
       if (!lessonId || !classId || !turma) return null;
-      const existing = await fetchAttendanceByLessonClass(lessonId, classId);
-      if (existing) return existing;
-      const podeCriar =
-        podeEditarFrequencia &&
-        (!isProfessor || professorPodeRegistrarChamada(turmasProfessor, classId));
-      if (!podeCriar) return null;
-      const meuId = usuario?.id ? Number(usuario.id) : null;
-      const professorPadrao =
-        turma.professorUsers.find((p) => p.id === meuId)?.id ??
-        turma.professorUsers[0]?.id ??
-        null;
-      return ensureAttendanceSheet(lessonId, classId, professorPadrao);
+      return fetchAttendanceByLessonClass(lessonId, classId);
     },
-    enabled: podeCarregarOperacional && Boolean(lessonId && classId && turma),
+    enabled:
+      podeCarregarOperacional &&
+      parametrosValidos &&
+      Boolean(lessonId && classId && turma),
     retry: (failureCount, error) => {
       if (error instanceof ApiError && error.status === 403) return false;
       return failureCount < 1;
@@ -170,7 +163,18 @@ export default function ClasseDetalhe() {
   });
 
   useEffect(() => {
+    setEdicaoIniciada(false);
+    setVisitantes(0);
+    setBiblias(0);
+    setRevistas(0);
+    setOfertaValor("0");
+    setProfessorId("");
+    setPresencas({});
+  }, [lessonId, classId]);
+
+  useEffect(() => {
     if (!sheet) return;
+    setEdicaoIniciada(true);
     setVisitantes(sheet.visitantes);
     setBiblias(sheet.biblias);
     setRevistas(sheet.revistas);
@@ -186,42 +190,54 @@ export default function ClasseDetalhe() {
   }, [sheet, alunosDaTurma]);
 
   const podeEditarChamada = podeEditarChamadaNaTurma({
-    podeEditarFrequencia,
+    podeEditarFrequencia: sheet
+      ? podeAlterarFrequencia
+      : podeCriarFrequencia,
     isProfessor,
     turmasProfessor,
     classId,
   });
   const mensagemBloqueio = mensagemBloqueioChamada({
-    podeEditarFrequencia,
+    podeEditarFrequencia: sheet
+      ? podeAlterarFrequencia
+      : podeCriarFrequencia,
   });
   const somenteLeitura = !podeEditarChamada;
 
   const statusChamada = getChamadaTurmaStatus(sheet);
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!sheet || !lessonId) throw new Error("Chamada não disponível");
-
-      await updateAttendanceSheet(sheet.id, {
+    mutationFn: (status: "RASCUNHO" | "CONCLUIDA") => {
+      if (!lessonId || !classId) throw new Error("Chamada não disponível");
+      return saveAttendanceRegistration({
+        lessonId,
+        classGroupId: classId,
+        status,
         professor: professorId ? Number(professorId) : null,
+        professorPresente: sheet?.professorPresente ?? false,
         visitantes,
         biblias,
         revistas,
         ofertaValor: Number(ofertaValor.replace(",", ".")) || 0,
+        records: alunosDaTurma.map((aluno) => ({
+          student: aluno.id,
+          presente: Boolean(presencas[aluno.id]),
+        })),
       });
-
-      const records = alunosDaTurma.map((aluno) => ({
-        student: aluno.id,
-        presente: Boolean(presencas[aluno.id]),
-      }));
-
-      return saveAttendanceRecords(sheet.id, records);
     },
-    onSuccess: () => {
+    onSuccess: (savedSheet) => {
+      queryClient.setQueryData(
+        orgQueryKey(activeOrgId, "attendance-classe", lessonId, classId),
+        savedSheet,
+      );
       void queryClient.invalidateQueries({ queryKey: ["attendance-classe"] });
       void queryClient.invalidateQueries({ queryKey: ["attendance-sheets"] });
       void queryClient.invalidateQueries({ queryKey: ["licoes"] });
-      toast.success("Registro da EBD salvo.");
+      toast.success(
+        savedSheet.status === "CONCLUIDA"
+          ? "Chamada concluída."
+          : "Rascunho da chamada salvo.",
+      );
       void refetchSheet();
     },
     onError: (error: Error) => {
@@ -229,27 +245,49 @@ export default function ClasseDetalhe() {
     },
   });
 
-  const iniciarChamadaMutation = useMutation({
-    mutationFn: async () => {
-      if (!lessonId || !classId || !turma) throw new Error("Dados incompletos");
-      return ensureAttendanceSheet(lessonId, classId, turma.professorUsers[0]?.id ?? null);
-    },
-    onSuccess: () => {
-      void refetchSheet();
-      toast.success("Registro da EBD iniciado.");
-    },
-    onError: () => toast.error("Não foi possível iniciar o registro."),
-  });
+  const iniciarEdicao = () => {
+    const meuId = usuario?.id ? Number(usuario.id) : null;
+    const professorPadrao =
+      turma?.professorUsers.find((professor) => professor.id === meuId)?.id ??
+      turma?.professorUsers[0]?.id;
+    setProfessorId(professorPadrao ? String(professorPadrao) : "");
+    setPresencas(
+      Object.fromEntries(alunosDaTurma.map((aluno) => [aluno.id, false])),
+    );
+    setEdicaoIniciada(true);
+  };
 
-  const presentes = alunosDaTurma.filter((a) => presencas[a.id]).length;
-  const ausentes = alunosDaTurma.length - presentes;
-  const pct = Math.round((presentes / Math.max(alunosDaTurma.length, 1)) * 100);
+  const alunosDaTurmaIds = useMemo(
+    () => new Set(alunosDaTurma.map((aluno) => aluno.id)),
+    [alunosDaTurma],
+  );
+  const registrosHistoricos = useMemo(
+    () =>
+      (sheet?.records ?? []).filter(
+        (registro) => !alunosDaTurmaIds.has(registro.student),
+      ),
+    [alunosDaTurmaIds, sheet],
+  );
+  const presentesAtivos = alunosDaTurma.filter((aluno) => presencas[aluno.id]).length;
+  const presentesHistoricos = registrosHistoricos.filter(
+    (registro) => registro.presente,
+  ).length;
+  const presentes = presentesAtivos + presentesHistoricos;
+  const ausentes =
+    alunosDaTurma.length - presentesAtivos +
+    (registrosHistoricos.length - presentesHistoricos);
+  const totalRegistros = presentes + ausentes;
+  const pct = Math.round((presentes / Math.max(totalRegistros, 1)) * 100);
+
+  if (!parametrosValidos) {
+    return <Navigate to="/licoes" replace />;
+  }
 
   if (carregandoContexto) {
     return <ClasseDetalheSkeleton />;
   }
 
-  if (isProfessor && !podeEditarFrequencia) {
+  if (isProfessor && !podeGerenciarFrequencia) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
@@ -319,7 +357,7 @@ export default function ClasseDetalhe() {
     return <Navigate to={destino ?? voltarPath()} replace />;
   }
 
-  if (!loadingSheet && !sheet && !podeEditarFrequencia) {
+  if (!loadingSheet && !sheet && !podeCriarFrequencia) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Nenhum registro da EBD para esta turma.</p>
@@ -330,12 +368,13 @@ export default function ClasseDetalhe() {
     );
   }
 
-  if (!loadingSheet && !sheet && podeEditarFrequencia && !podeEditarChamada) {
+  if (!loadingSheet && !sheet && podeGerenciarFrequencia && !podeEditarChamada) {
     return (
       <div className="space-y-4">
         <HeaderTurma
           turmaNome={turma.nome}
           licao={licao}
+          status="nao_iniciada"
           onBack={() => navigate(voltarPath())}
         />
         {mensagemBloqueio && (
@@ -350,12 +389,13 @@ export default function ClasseDetalhe() {
     );
   }
 
-  if (!loadingSheet && !sheet && podeEditarChamada) {
+  if (!loadingSheet && !sheet && podeEditarChamada && !edicaoIniciada) {
     return (
       <div className="space-y-6 animate-fade-in">
         <HeaderTurma
           turmaNome={turma.nome}
           licao={licao}
+          status="nao_iniciada"
           onBack={() => navigate(voltarPath())}
         />
         <Card>
@@ -364,13 +404,7 @@ export default function ClasseDetalhe() {
               Ainda não há registro para {turma.nome} nesta lição. Inclua presenças, bíblias,
               revistas, visitantes e oferta.
             </p>
-            <Button
-              onClick={() => iniciarChamadaMutation.mutate()}
-              disabled={iniciarChamadaMutation.isPending}
-            >
-              {iniciarChamadaMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+            <Button onClick={iniciarEdicao}>
               Iniciar registro da EBD
             </Button>
           </CardContent>
@@ -480,45 +514,93 @@ export default function ClasseDetalhe() {
           <CardTitle className="text-base">Lista de chamada ({pct}%)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {alunosDaTurma.length === 0 ? (
+          {alunosDaTurma.length === 0 && registrosHistoricos.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum aluno nesta turma.</p>
           ) : (
-            alunosDaTurma.map((aluno) => (
-              <div
-                key={aluno.id}
-                className="flex items-center justify-between rounded-lg border p-3"
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-xs font-semibold">
-                      {getIniciais(aluno.nome)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="font-medium">{aluno.nome}</span>
+            <>
+              {alunosDaTurma.map((aluno) => (
+                <div
+                  key={aluno.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold">
+                        {getIniciais(aluno.nome)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{aluno.nome}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {presencas[aluno.id] ? "Presente" : "Ausente"}
+                    </span>
+                    <Switch
+                      checked={Boolean(presencas[aluno.id])}
+                      disabled={somenteLeitura}
+                      onCheckedChange={(checked) =>
+                        setPresencas((prev) => ({ ...prev, [aluno.id]: checked }))
+                      }
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {presencas[aluno.id] ? "Presente" : "Ausente"}
-                  </span>
-                  <Switch
-                    checked={Boolean(presencas[aluno.id])}
-                    disabled={somenteLeitura}
-                    onCheckedChange={(checked) =>
-                      setPresencas((prev) => ({ ...prev, [aluno.id]: checked }))
-                    }
-                  />
+              ))}
+
+              {registrosHistoricos.length > 0 && (
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Registros históricos preservados
+                  </p>
+                  {registrosHistoricos.map((registro) => (
+                    <div
+                      key={`historico-${registro.id}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-dashed p-3"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-muted text-xs font-semibold">
+                            {getIniciais(registro.alunoNome)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{registro.alunoNome}</p>
+                          <Badge variant="outline" className="mt-1 text-[10px]">
+                            {alunosAtivosIds.has(registro.student)
+                              ? "Mudou de turma"
+                              : "Cadastro inativo"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {registro.presente ? "Presente" : "Ausente"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))
+              )}
+            </>
           )}
         </CardContent>
       </Card>
 
       {!somenteLeitura && (
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+          {licao.status !== "Finalizada" && (
+            <Button
+              variant="outline"
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate("RASCUNHO")}
+            >
+              {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar rascunho
+            </Button>
+          )}
+          <Button
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate("CONCLUIDA")}
+          >
             {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
+            {licao.status === "Finalizada" ? "Salvar correção concluída" : "Concluir chamada"}
           </Button>
         </div>
       )}
@@ -547,7 +629,15 @@ function HeaderTurma({
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <Badge variant="secondary">Lição {licao.numero}</Badge>
           {status && (
-            <Badge variant={status === "registrada" ? "default" : "outline"}>
+            <Badge
+              variant={
+                status === "concluida"
+                  ? "default"
+                  : status === "rascunho"
+                    ? "secondary"
+                    : "outline"
+              }
+            >
               {chamadaStatusLabel[status]}
             </Badge>
           )}

@@ -49,14 +49,11 @@ export default function Trimestres() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { activeOrgId, podeCarregarOperacional, isAdminSistema, hasRole } = usePermissions();
-
-  if (!podeGerenciarTrimestres({ isAdminSistema, hasRole })) {
-    return <Navigate to="/licoes" replace />;
-  }
+  const podeGerenciar = podeGerenciarTrimestres({ isAdminSistema, hasRole });
   const { data: trimestres = [], isLoading } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "trimestres"),
-    queryFn: fetchTrimestres,
-    enabled: podeCarregarOperacional,
+    queryFn: () => fetchTrimestres(),
+    enabled: podeCarregarOperacional && podeGerenciar,
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -115,6 +112,10 @@ export default function Trimestres() {
       await createMutation.mutateAsync({ ...form, numero, ano });
     }
     setIsDialogOpen(false);
+  }
+
+  if (!podeGerenciar) {
+    return <Navigate to="/licoes" replace />;
   }
 
   if (isLoading) {

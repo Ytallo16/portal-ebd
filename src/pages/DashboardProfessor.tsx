@@ -23,6 +23,8 @@ import {
 
 import { BirthdayDateBadge } from "@/components/dashboard/BirthdayDateBadge";
 import { BirthdayColumns } from "@/components/dashboard/BirthdayColumns";
+import { DashboardActionQueue } from "@/components/dashboard/DashboardActionQueue";
+import { ProfessorLessonTodayAlert } from "@/components/dashboard/ProfessorLessonTodayAlert";
 import { DashboardProfessorSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { ApiError } from "@/lib/api";
@@ -38,7 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDate, getIniciais } from "@/lib/formatters";
-import { licoesTurmaPath } from "@/lib/licoesRoutes";
+import { licoesRegistroTurmaPath, licoesTurmaPath } from "@/lib/licoesRoutes";
 import { fetchProfessorDashboard } from "@/lib/portalApi";
 
 export default function DashboardProfessor() {
@@ -147,6 +149,26 @@ export default function DashboardProfessor() {
           </Select>
         </div>
       )}
+
+      {data.licoesHoje.map((licao) => (
+        <ProfessorLessonTodayAlert
+          key={`${licao.id}-${licao.turmaId}`}
+          licao={licao}
+          turmaNome={licao.turmaNome}
+          onOpen={() =>
+            navigate(
+              licoesRegistroTurmaPath(
+                licao.ano,
+                licao.trimestre,
+                licao.numero,
+                licao.turmaId,
+              ),
+            )
+          }
+        />
+      ))}
+
+      <DashboardActionQueue excludeKinds={["LESSON_TODAY"]} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (

@@ -32,21 +32,24 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { isSomenteProfessor } from "@/lib/chamada";
 import { useAuth } from "@/auth/AuthProvider";
 import { deveExibirMenuIgrejas, type ModuloPermissao } from "@/lib/portalApi";
+import {
+  deveExibirContextoNaSidebar,
+  deveExibirItemParaProfessor,
+} from "@/components/layout/navigationVisibility";
 
 const items: Array<{
   title: string;
   url: string;
   icon: typeof LayoutDashboard;
   modulo: ModuloPermissao;
-  hideForProfessor?: boolean;
 }> = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, modulo: "dashboard" },
   { title: "Lições", url: "/licoes", icon: BookOpen, modulo: "licoes" },
   { title: "Turmas", url: "/turmas", icon: GraduationCap, modulo: "turmas" },
   { title: "Alunos", url: "/alunos", icon: Users, modulo: "alunos" },
   { title: "Professores", url: "/professores", icon: GraduationCap, modulo: "alunos" },
-  { title: "Financeiro", url: "/financeiro", icon: DollarSign, modulo: "financeiro", hideForProfessor: true },
-  { title: "Revistas", url: "/revistas", icon: BookMarked, modulo: "revistas", hideForProfessor: true },
+  { title: "Financeiro", url: "/financeiro", icon: DollarSign, modulo: "financeiro" },
+  { title: "Revistas", url: "/revistas", icon: BookMarked, modulo: "revistas" },
 ];
 
 const configuracaoItems: Array<{
@@ -77,6 +80,7 @@ export function AppSidebar() {
   const { logout } = useAuth();
   const { can, isAdminSistema, hasRole, usuario, organizacaoAtiva } = usePermissions();
   const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
+  const exibirContextoNaSidebar = deveExibirContextoNaSidebar(isAdminSistema);
   const secretarioCampo =
     !isAdminSistema && (usuario?.papeis ?? []).some((p) => p.trim().toUpperCase() === "SECRETARIO_CAMPO");
   const showIgrejasMenu = deveExibirMenuIgrejas({
@@ -88,7 +92,7 @@ export function AppSidebar() {
 
   const menuItems = useMemo(() => {
     const base = items.filter((item) => {
-      if (item.hideForProfessor && somenteProfessor) return false;
+      if (!deveExibirItemParaProfessor(item, somenteProfessor)) return false;
       return isAdminSistema || can(item.modulo, "visualizar");
     });
     if (!showIgrejasMenu) {
@@ -99,7 +103,7 @@ export function AppSidebar() {
       { title: "Igrejas", url: "/igrejas", icon: Church, modulo: "organizacoes" as ModuloPermissao },
       ...base.slice(1),
     ];
-  }, [can, isAdminSistema, organizacaoAtiva, showIgrejasMenu, somenteProfessor]);
+  }, [can, isAdminSistema, showIgrejasMenu, somenteProfessor]);
   const configItems = useMemo(
     () =>
       configuracaoItems.filter((item) =>
@@ -167,12 +171,14 @@ export function AppSidebar() {
                 {usuario?.nome ?? "Usuário"}
               </p>
               <p className="mt-0.5 truncate text-xs text-sidebar-muted">
-                {organizacaoAtiva?.nome ?? usuario?.papel ?? "sem contexto"}
+                {somenteProfessor
+                  ? usuario?.papel ?? "Professor"
+                  : organizacaoAtiva?.nome ?? usuario?.papel ?? "sem contexto"}
               </p>
             </button>
           </div>
         )}
-        {isMobile && !collapsed ? (
+        {isMobile && !collapsed && exibirContextoNaSidebar ? (
           <div className="mt-3 w-full border-t border-sidebar-border/50 pt-3">
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted">
               Contexto

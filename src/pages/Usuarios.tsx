@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PersonGridCard, personListGridClassName } from "@/components/lists/PersonGridCard";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,11 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { usePermissions } from "@/auth/usePermissions";
+import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { ApiError } from "@/lib/api";
 import {
   createUsuario,
-  fetchUsuarios,
+  fetchUsuariosPage,
+  fetchUsuariosStats,
   resetUserPassword,
   toggleUserActive,
   updateUsuario,
@@ -73,6 +74,8 @@ function defaultPapelParaCriacao(
 export default function Usuarios() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+  const [page, setPage] = useState(1);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
@@ -89,9 +92,29 @@ export default function Usuarios() {
     isActive: true,
   });
 
-  const { data: usuarios = [], isLoading } = useQuery({ queryKey: ["usuarios"], queryFn: fetchUsuarios });
-  const { isAdminSistema, can, hasRole, contextoCampo, contextoIgreja, organizacaoAtiva, usuario } =
-    usePermissions();
+  const {
+    activeOrgId,
+    isAdminSistema,
+    can,
+    hasRole,
+    contextoCampo,
+    contextoIgreja,
+    organizacaoAtiva,
+    usuario,
+  } = usePermissions();
+  const { data: usuariosPage, isLoading } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "usuarios", page, deferredSearch),
+    queryFn: () => fetchUsuariosPage({ page, search: deferredSearch }),
+  });
+  const { data: usuariosStats } = useQuery({
+    queryKey: orgQueryKey(activeOrgId, "usuarios-stats"),
+    queryFn: fetchUsuariosStats,
+  });
+  const usuarios = usuariosPage?.items ?? [];
+
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearch, activeOrgId]);
   // Admin do sistema pode criar usuários mesmo sem contexto ativo (ex.: criar outro
   // master). O backend já permite ADMINISTRADOR sem organização; sem contexto, o
   // seletor de papéis oferece apenas "Administrador do sistema".
@@ -124,6 +147,7 @@ export default function Usuarios() {
     mutationFn: (userId: string) => toggleUserActive(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["usuarios-stats"] });
       queryClient.invalidateQueries({ queryKey: ["turmas"] });
     },
   });
@@ -149,6 +173,7 @@ export default function Usuarios() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["usuarios-stats"] });
       queryClient.invalidateQueries({ queryKey: ["turmas"] });
       setIsEditOpen(false);
       setEditingUserId(null);
@@ -158,6 +183,7 @@ export default function Usuarios() {
     mutationFn: createUsuario,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["usuarios-stats"] });
       setIsCreateOpen(false);
       setCreateForm({ nome: "", email: "", senha: "123456", papel: "", isActive: true });
     },
@@ -209,15 +235,8 @@ export default function Usuarios() {
     await resetPasswordMutation.mutateAsync(resettingUser.id);
   }
 
-  const filtered = usuarios.filter(
-    (u) =>
-      u.nome.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.papel.toLowerCase().includes(search.toLowerCase()),
-  );
-
-  const ativos = usuarios.filter((u) => u.status === "Ativo").length;
-  const inativos = usuarios.filter((u) => u.status === "Inativo").length;
+  const ativos = usuariosStats?.ativos ?? 0;
+  const inativos = usuariosStats?.inativos ?? 0;
 
   const precisaIgrejaParaPerfil =
     podeCriarUsuario &&
@@ -257,7 +276,7 @@ export default function Usuarios() {
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <Users className="h-5 w-5 text-primary" />
-            <div><p className="text-xl font-bold">{usuarios.length}</p><p className="text-xs text-muted-foreground">Total</p></div>
+            <div><p className="text-xl font-bold">{usuariosStats?.total ?? usuariosPage?.count ?? 0}</p><p className="text-xs text-muted-foreground">Total</p></div>
           </CardContent>
         </Card>
         <Card>
@@ -275,7 +294,7 @@ export default function Usuarios() {
       </div>
 
       <div className={personListGridClassName()}>
-        {filtered.map((u) => (
+        {usuarios.map((u) => (
           <PersonGridCard
             key={u.id}
             nome={u.nome}
@@ -334,6 +353,30 @@ export default function Usuarios() {
           />
         ))}
       </div>
+
+      {usuariosPage && usuariosPage.totalPages > 1 ? (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!usuariosPage.hasPrevious}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+          >
+            Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Página {usuariosPage.page} de {usuariosPage.totalPages}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!usuariosPage.hasNext}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Próxima
+          </Button>
+        </div>
+      ) : null}
 
       <Dialog
         open={isCreateOpen}

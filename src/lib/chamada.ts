@@ -1,16 +1,29 @@
 import type { AttendanceSheet } from "@/lib/portalApi";
 
-export type ChamadaTurmaStatus = "nao_iniciada" | "registrada";
+export type ChamadaTurmaStatus = "nao_iniciada" | "rascunho" | "concluida";
 
 export function getChamadaTurmaStatus(sheet?: AttendanceSheet | null): ChamadaTurmaStatus {
   if (!sheet) return "nao_iniciada";
-  return "registrada";
+  return sheet.status === "CONCLUIDA" || Boolean(sheet.finalizedAt)
+    ? "concluida"
+    : "rascunho";
 }
 
 export const chamadaStatusLabel: Record<ChamadaTurmaStatus, string> = {
   nao_iniciada: "Não iniciada",
-  registrada: "Registrada",
+  rascunho: "Rascunho",
+  concluida: "Concluída",
 };
+
+export function selecionarAlvoFrequenciaProfessor<
+  T extends { classGroupId: string },
+>(targets: T[], selectedClassGroupId?: string): T | undefined {
+  if (targets.length === 1) return targets[0];
+  if (!selectedClassGroupId) return undefined;
+  return targets.find(
+    (target) => target.classGroupId === selectedClassGroupId,
+  );
+}
 
 export function isSecretarioOuAdmin(papeis: {
   isAdminSistema: boolean;

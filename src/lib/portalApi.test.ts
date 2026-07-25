@@ -5,11 +5,16 @@ import { igrejasDoSecretarioCampo } from "@/lib/orgContextSelection";
 import {
   deveExibirMenuIgrejas,
   deveExibirSeletorIgrejasNoHeader,
+  confirmarImportacaoAlunos,
+  desfazerImportacaoAlunos,
+  fetchAlunosPage,
+  fetchProfessorDashboard,
   fetchTurmas,
   isInstanciaCampo,
   isInstanciaIgrejaIndividual,
   isTipoCampo,
   isTipoIgreja,
+  saveAttendanceRegistration,
   updateTurma,
   type OrganizacaoContexto,
   type UsuarioLogado,
@@ -79,13 +84,181 @@ describe("turmas — leitura e edição", () => {
       ativa: true,
     });
   });
+
+  it("salva ficha e presenças juntas no endpoint direto", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        id: 12,
+        lesson: 4,
+        class_group: 8,
+        status: "CONCLUIDA",
+        finalized_at: "2026-07-24T12:00:00Z",
+        records: [{ id: 1, student: 31, aluno_nome: "Ana", presente: true }],
+      }),
+    );
+
+    const result = await saveAttendanceRegistration({
+      lessonId: "4",
+      classGroupId: "8",
+      status: "CONCLUIDA",
+      professor: 5,
+      visitantes: 2,
+      biblias: 10,
+      revistas: 8,
+      ofertaValor: 25.5,
+      records: [{ student: "31", presente: true }],
+    });
+
+    const [requestUrl, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(requestUrl).toContain("/lessons/4/classes/8/attendance");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      status: "CONCLUIDA",
+      professor: 5,
+      visitantes: 2,
+      biblias: 10,
+      revistas: 8,
+      oferta_valor: "25.5",
+      records: [{ student: 31, presente: true }],
+    });
+    expect(result).toMatchObject({
+      id: "12",
+      status: "CONCLUIDA",
+      finalizedAt: "2026-07-24T12:00:00Z",
+    });
+  });
+
+  it("busca alunos com paginação e pesquisa no servidor", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        count: 49,
+        results: [
+          {
+            id: 31,
+            nome: "Maria Silva",
+            sexo: "F",
+            data_nascimento: "2001-05-20",
+            class_group: 8,
+            is_active: true,
+            deleted_at: null,
+          },
+        ],
+      }),
+    );
+
+    const result = await fetchAlunosPage({
+      search: "Maria",
+      page: 2,
+      pageSize: 24,
+    });
+
+    const [requestUrl] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(requestUrl).toContain("/students/?");
+    expect(requestUrl).toContain("search=Maria");
+    expect(requestUrl).toContain("page=2");
+    expect(requestUrl).toContain("page_size=24");
+    expect(result).toMatchObject({
+      page: 2,
+      pageSize: 24,
+      total: 49,
+      totalPages: 3,
+    });
+    expect(result.items[0]).toMatchObject({
+      id: "31",
+      nome: "Maria Silva",
+      turmaId: "8",
+      isActive: true,
+    });
+  });
+
+  it("confirma e desfaz um lote pelos endpoints imutáveis do lote", async () => {
+    const response = {
+      fase: "CONFIRMACAO",
+      lote_id: "abc-123",
+      status_lote: "CONFIRMED",
+      resultados: [],
+    };
+    fetchMock.mockResolvedValue(jsonResponse(response));
+
+    await confirmarImportacaoAlunos("abc-123");
+    await desfazerImportacaoAlunos("abc-123");
+
+    const confirmCall = fetchMock.mock.calls.at(-2) as [string, RequestInit];
+    const undoCall = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(confirmCall[0]).toContain("/students/import/abc-123/confirm/");
+    expect(confirmCall[1].method).toBe("POST");
+    expect(undoCall[0]).toContain("/students/import/abc-123/undo/");
+    expect(undoCall[1].method).toBe("POST");
+  });
+
+  it("preserva a turma de cada alerta de aula de hoje do professor", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        turmas_disponiveis: [
+          { id: 8, nome: "Adultos", cor: "#111111" },
+          { id: 9, nome: "Jovens", cor: "#222222" },
+        ],
+        turma: {
+          id: 8,
+          nome: "Adultos",
+          cor: "#111111",
+          total_alunos: 12,
+        },
+        trimestre: null,
+        resumo: {},
+        licoes_hoje: [
+          {
+            id: 4,
+            numero: 7,
+            tema: "Lição de hoje",
+            data: "2026-07-24",
+            trimestre: 3,
+            ano: 2026,
+            turma_id: 8,
+            turma_nome: "Adultos",
+            registrada: false,
+          },
+          {
+            id: 4,
+            numero: 7,
+            tema: "Lição de hoje",
+            data: "2026-07-24",
+            trimestre: 3,
+            ano: 2026,
+            turma_id: 9,
+            turma_nome: "Jovens",
+            registrada: true,
+          },
+        ],
+      }),
+    );
+
+    const dashboard = await fetchProfessorDashboard();
+
+    expect(dashboard.licoesHoje).toEqual([
+      expect.objectContaining({
+        id: 4,
+        turmaId: 8,
+        turmaNome: "Adultos",
+        registrada: false,
+      }),
+      expect.objectContaining({
+        id: 4,
+        turmaId: 9,
+        turmaNome: "Jovens",
+        registrada: true,
+      }),
+    ]);
+  });
 });
 
 describe("buildPermissionHelpers", () => {
   it("identifica admin do sistema e permissões", () => {
     const usuario: UsuarioLogado = {
+      id: "1",
       nome: "Admin",
       email: "admin@test.com",
+      fotoUrl: null,
       papel: "Administrador do sistema",
       papeis: ["ADMINISTRADOR"],
       status: "Ativo",
@@ -99,6 +272,8 @@ describe("buildPermissionHelpers", () => {
         usuarios: { visualizar: true, criar: true, editar: true, excluir: true, aprovar: true },
       },
       turmasProfessor: [],
+      acessoBloqueado: false,
+      motivoBloqueio: null,
     };
 
     const { isAdminSistema, can, hasRole } = buildPermissionHelpers(usuario);
@@ -110,8 +285,10 @@ describe("buildPermissionHelpers", () => {
 
   it("respeita matriz do professor", () => {
     const usuario: UsuarioLogado = {
+      id: "2",
       nome: "Professor",
       email: "prof@test.com",
+      fotoUrl: null,
       papel: "Professor",
       papeis: ["PROFESSOR"],
       status: "Ativo",
@@ -133,6 +310,8 @@ describe("buildPermissionHelpers", () => {
         turmas: { visualizar: true, criar: false, editar: false, excluir: false, aprovar: false },
       },
       turmasProfessor: [{ id: 10, nome: "Adultos" }],
+      acessoBloqueado: false,
+      motivoBloqueio: null,
     };
 
     const { can } = buildPermissionHelpers(usuario);
