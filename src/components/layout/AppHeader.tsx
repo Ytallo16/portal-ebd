@@ -14,10 +14,10 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/hooks/useTheme";
 import { usePermissions } from "@/auth/usePermissions";
-import { NotificationBell } from "@/components/layout/NotificationBell";
 import { OrgContextSwitcher } from "@/components/layout/OrgContextSwitcher";
 import { getLicoesBreadcrumbs, getLicoesPageTitle } from "@/components/layout/licoesBreadcrumbs";
 import { isSomenteProfessor } from "@/lib/chamada";
+import { deveExibirSeletorContextoNoHeader } from "@/components/layout/navigationVisibility";
 
 function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boolean }) {
   const licoesTitle = getLicoesPageTitle(pathname, licoesOptions);
@@ -89,8 +89,9 @@ export function AppHeader() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { usuario: usuarioLogado, isAdminSistema, hasRole } = usePermissions();
+  const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
   const licoesNavOptions = {
-    somenteProfessor: isSomenteProfessor({ isAdminSistema, hasRole }),
+    somenteProfessor,
   };
   const pageTitle = getPageTitle(location.pathname, licoesNavOptions);
   const breadcrumbs = getBreadcrumbs(location.pathname, licoesNavOptions);
@@ -134,15 +135,15 @@ export function AppHeader() {
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-        <div className="min-w-0 max-w-[min(32vw,7rem)] shrink sm:max-w-[9rem] md:max-w-[11rem]">
-          <OrgContextSwitcher variant="header" />
-        </div>
+        {deveExibirSeletorContextoNoHeader(somenteProfessor) && (
+          <div className="min-w-0 max-w-[min(32vw,7rem)] shrink sm:max-w-[9rem] md:max-w-[11rem]">
+            <OrgContextSwitcher variant="header" />
+          </div>
+        )}
 
         <Button variant="ghost" size="icon" className="touch-target shrink-0" onClick={toggleTheme}>
           {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
-
-        <NotificationBell />
 
         <Button
           variant="ghost"

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, GraduationCap, Medal, Search, TrendingUp, UserRoundCheck, Users } from "lucide-react";
+import { GraduationCap, Medal, Search, TrendingUp, UserPlus, UserRoundCheck, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 
@@ -30,13 +30,13 @@ export default function Professores() {
   const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
   const podeEditarProfessores = !somenteProfessor && (isAdminSistema || can("turmas", "editar"));
   const [search, setSearch] = useState("");
-  const [transferirTarget, setTransferirTarget] = useState<{
+  const [vincularTarget, setVincularTarget] = useState<{
     professorId: string;
     nome: string;
-    turmaAtualId: string;
-    turmaAtualNome: string;
+    turmaIds: string[];
+    turmaNomes: string[];
   } | null>(null);
-  const [turmaSelecionadaTransferencia, setTurmaSelecionadaTransferencia] = useState("");
+  const [turmaSelecionadaVinculo, setTurmaSelecionadaVinculo] = useState("");
   const [ano, setAno] = useState(String(getAnoAtual()));
   const [trimestre, setTrimestre] = useState("1");
   const [turmaIdRanking, setTurmaIdRanking] = useState("todas");
@@ -67,19 +67,51 @@ export default function Professores() {
     enabled: podeCarregarOperacional,
   });
 
-  const professores = useMemo(() => {
+  const vinculosProfessores = useMemo(() => {
     const todos = teachersApi.buildMatriculadosProfessores(turmas);
     if (!somenteProfessor) return todos;
     const idsTurmasProfessor = new Set(turmasProfessor.map((turma) => String(turma.id)));
     return todos.filter((item) => idsTurmasProfessor.has(item.turmaId));
   }, [turmas, somenteProfessor, turmasProfessor]);
 
+  const professores = useMemo(() => {
+    const agrupados = new Map<
+      string,
+      {
+        professorId: string;
+        nome: string;
+        turmaIds: string[];
+        turmaNomes: string[];
+      }
+    >();
+    vinculosProfessores.forEach((vinculo) => {
+      const atual = agrupados.get(vinculo.professorId) ?? {
+        professorId: vinculo.professorId,
+        nome: vinculo.nome,
+        turmaIds: [],
+        turmaNomes: [],
+      };
+      atual.turmaIds.push(vinculo.turmaId);
+      atual.turmaNomes.push(vinculo.turmaNome);
+      agrupados.set(vinculo.professorId, atual);
+    });
+    return Array.from(agrupados.values()).sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+  }, [vinculosProfessores]);
+
   const filtrados = professores.filter((item) => {
     const termo = search.toLowerCase();
-    return item.nome.toLowerCase().includes(termo) || item.turmaNome.toLowerCase().includes(termo);
+    return (
+      item.nome.toLowerCase().includes(termo) ||
+      item.turmaNomes.some((nome) => nome.toLowerCase().includes(termo))
+    );
   });
 
-  const totalTurmas = useMemo(() => new Set(professores.map((item) => item.turmaId)).size, [professores]);
+  const totalTurmas = useMemo(
+    () => new Set(vinculosProfessores.map((item) => item.turmaId)).size,
+    [vinculosProfessores],
+  );
   const anosDisponiveis = useMemo(() => {
     const anos = new Set<number>([getAnoAtual()]);
     trimestres.forEach((item) => anos.add(item.ano));
@@ -89,37 +121,27 @@ export default function Professores() {
     ranking.length === 0
       ? 0
       : ranking.reduce((acc, item) => acc + item.presencaPct, 0) / ranking.length;
-  const vinculoPorProfessorId = useMemo(
-    () => new Map(professores.map((item) => [item.professorId, item])),
-    [professores],
-  );
-  const turmasDisponiveisParaTransferencia = useMemo(() => {
-    if (!transferirTarget) return [];
-    return turmas.filter(
-      (turma) => turma.professorUsers.length === 0 || turma.id === transferirTarget.turmaAtualId,
-    );
-  }, [turmas, transferirTarget]);
+  const turmasDisponiveisParaVinculo = useMemo(() => {
+    if (!vincularTarget) return [];
+    const vinculadas = new Set(vincularTarget.turmaIds);
+    return turmas.filter((turma) => !vinculadas.has(turma.id));
+  }, [turmas, vincularTarget]);
 
   const atribuirMutation = useMutation({
     mutationFn: async () => {
-      if (!transferirTarget || !turmaSelecionadaTransferencia) {
-        throw new Error("Selecione a turma de destino.");
-      }
-      const vinculoAtual = vinculoPorProfessorId.get(transferirTarget.professorId);
-      if (vinculoAtual?.turmaId === turmaSelecionadaTransferencia) return;
-      if (vinculoAtual) {
-        await teachersApi.removeProfessorTurma(vinculoAtual.linkId);
+      if (!vincularTarget || !turmaSelecionadaVinculo) {
+        throw new Error("Selecione uma turma.");
       }
       await teachersApi.addProfessorTurma(
-        turmaSelecionadaTransferencia,
-        transferirTarget.professorId,
+        turmaSelecionadaVinculo,
+        vincularTarget.professorId,
       );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["turmas"] });
-      setTransferirTarget(null);
-      setTurmaSelecionadaTransferencia("");
-      toast.success("Vínculo de professor atualizado com sucesso.");
+      setVincularTarget(null);
+      setTurmaSelecionadaVinculo("");
+      toast.success("Professor vinculado à nova turma.");
     },
     onError: (error) => {
       const msg =
@@ -172,7 +194,7 @@ export default function Professores() {
             <GraduationCap className="h-5 w-5 text-primary" />
             <div>
               <p className="text-xl font-bold">{professores.length}</p>
-              <p className="text-xs text-muted-foreground">Vínculos de professor</p>
+              <p className="text-xs text-muted-foreground">Professores vinculados</p>
             </div>
           </CardContent>
         </Card>
@@ -309,15 +331,17 @@ export default function Professores() {
         ) : (
           filtrados.map((item) => (
             <PersonGridCard
-              key={item.id}
+              key={item.professorId}
               nome={item.nome}
               fallbackClassName="bg-secondary text-secondary-foreground"
               badges={
                 <>
                   <Badge className="text-xs">Professor</Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {item.turmaNome || "Sem turma"}
-                  </Badge>
+                  {item.turmaNomes.map((turmaNome) => (
+                    <Badge key={turmaNome} variant="outline" className="text-xs">
+                      {turmaNome}
+                    </Badge>
+                  ))}
                 </>
               }
               footer={
@@ -328,17 +352,18 @@ export default function Professores() {
                     size="sm"
                     className="w-full touch-target sm:w-auto"
                     onClick={() => {
-                      setTransferirTarget({
+                      setVincularTarget({
                         professorId: item.professorId,
                         nome: item.nome,
-                        turmaAtualId: item.turmaId,
-                        turmaAtualNome: item.turmaNome || "Sem turma",
+                        turmaIds: item.turmaIds,
+                        turmaNomes: item.turmaNomes,
                       });
-                      setTurmaSelecionadaTransferencia(item.turmaId);
+                      setTurmaSelecionadaVinculo("");
                     }}
+                    disabled={item.turmaIds.length >= turmas.length}
                   >
-                    <ArrowRightLeft className="mr-2 h-4 w-4" />
-                    Transferir de turma
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Vincular a outra turma
                   </Button>
                 ) : null
               }
@@ -348,39 +373,40 @@ export default function Professores() {
       </div>
 
       <Dialog
-        open={Boolean(transferirTarget)}
+        open={Boolean(vincularTarget)}
         onOpenChange={(open) => {
           if (!open) {
-            setTransferirTarget(null);
-            setTurmaSelecionadaTransferencia("");
+            setVincularTarget(null);
+            setTurmaSelecionadaVinculo("");
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Transferir professor</DialogTitle>
+            <DialogTitle>Vincular professor a outra turma</DialogTitle>
             <DialogDescription>
-              {transferirTarget?.nome ?? "Professor"} está na turma{" "}
-              {transferirTarget?.turmaAtualNome ?? "atual"}.
-              Escolha a nova turma para concluir a transferência.
+              {vincularTarget?.nome ?? "Professor"} continuará nas turmas atuais. Escolha
+              uma turma adicional.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">Turma atual</p>
-              <p className="text-sm font-medium">{transferirTarget?.turmaAtualNome ?? "—"}</p>
+              <p className="mb-1 text-xs text-muted-foreground">Turmas atuais</p>
+              <p className="text-sm font-medium">
+                {vincularTarget?.turmaNomes.join(", ") || "—"}
+              </p>
             </div>
             <div>
-              <p className="mb-1 text-xs text-muted-foreground">Nova turma</p>
+              <p className="mb-1 text-xs text-muted-foreground">Turma adicional</p>
               <Select
-                value={turmaSelecionadaTransferencia}
-                onValueChange={setTurmaSelecionadaTransferencia}
+                value={turmaSelecionadaVinculo}
+                onValueChange={setTurmaSelecionadaVinculo}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a turma de destino" />
+                  <SelectValue placeholder="Selecione a turma" />
                 </SelectTrigger>
                 <SelectContent>
-                  {turmasDisponiveisParaTransferencia.map((turma) => (
+                  {turmasDisponiveisParaVinculo.map((turma) => (
                     <SelectItem key={turma.id} value={turma.id}>
                       {turma.nome}
                     </SelectItem>
@@ -392,17 +418,17 @@ export default function Professores() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setTransferirTarget(null);
-                  setTurmaSelecionadaTransferencia("");
+                  setVincularTarget(null);
+                  setTurmaSelecionadaVinculo("");
                 }}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={() => atribuirMutation.mutate()}
-                disabled={!turmaSelecionadaTransferencia || atribuirMutation.isPending}
+                disabled={!turmaSelecionadaVinculo || atribuirMutation.isPending}
               >
-                {atribuirMutation.isPending ? "Transferindo..." : "Confirmar transferência"}
+                {atribuirMutation.isPending ? "Vinculando..." : "Confirmar vínculo"}
               </Button>
             </div>
           </div>

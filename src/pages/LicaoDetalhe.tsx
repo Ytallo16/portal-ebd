@@ -43,6 +43,7 @@ import {
   isSomenteProfessor,
   type ChamadaTurmaStatus,
 } from "@/lib/chamada";
+import { ApiError } from "@/lib/api";
 import {
   createLicao,
   fetchAttendanceSheets,
@@ -70,7 +71,8 @@ import {
 } from "recharts";
 
 function statusBadgeVariant(status: ChamadaTurmaStatus) {
-  if (status === "registrada") return "default" as const;
+  if (status === "concluida") return "default" as const;
+  if (status === "rascunho") return "secondary" as const;
   return "outline" as const;
 }
 
@@ -171,8 +173,20 @@ export default function LicaoDetalhe() {
       toast.success("Escala de professores salva.");
       void queryClient.invalidateQueries({ queryKey: ["lesson-schedules"] });
     },
-    onError: () => toast.error("Não foi possível salvar a escala."),
+    onError: (error) =>
+      toast.error(
+        error instanceof ApiError && error.message
+          ? error.message
+          : "Não foi possível salvar a escala.",
+      ),
   });
+
+  function professorSelecionadoEmOutraTurma(professorId: number, turmaId: string) {
+    return Object.entries(escalaForm).some(
+      ([outraTurmaId, selecionadoId]) =>
+        outraTurmaId !== turmaId && selecionadoId === String(professorId),
+    );
+  }
 
   const escalaPorTurma = useMemo(() => {
     const map = new Map<string, (typeof escalas)[number]>();
@@ -218,8 +232,9 @@ export default function LicaoDetalhe() {
     });
   }, [lessonId, turmasBase, sheets, escalaPorTurma]);
 
-  const todasTurmasComRegistro =
-    turmasComChamada.length > 0 && turmasComChamada.every((t) => t.sheet);
+  const todasTurmasComChamadaConcluida =
+    turmasComChamada.length > 0 &&
+    turmasComChamada.every((turma) => turma.status === "concluida");
 
   const chamadaPorClasse = turmasComChamada.filter(
     (c) => c.presentes > 0 || c.ausentes > 0,
@@ -250,7 +265,7 @@ export default function LicaoDetalhe() {
     secretarioOuAdmin &&
     (can("licoes", "editar") || can("licoes", "aprovar")) &&
     !lessonFinalizada &&
-    todasTurmasComRegistro;
+    todasTurmasComChamadaConcluida;
 
   const finalizeMutation = useMutation({
     mutationFn: () => finalizeLesson(lessonId!),
@@ -540,11 +555,22 @@ export default function LicaoDetalhe() {
                               Nenhum professor vinculado à turma
                             </SelectItem>
                           ) : (
-                            turma.professorUsers.map((professor) => (
-                              <SelectItem key={professor.id} value={String(professor.id)}>
-                                {professor.nome}
-                              </SelectItem>
-                            ))
+                            turma.professorUsers.map((professor) => {
+                              const indisponivel = professorSelecionadoEmOutraTurma(
+                                professor.id,
+                                turma.id,
+                              );
+                              return (
+                                <SelectItem
+                                  key={professor.id}
+                                  value={String(professor.id)}
+                                  disabled={indisponivel}
+                                >
+                                  {professor.nome}
+                                  {indisponivel ? " — já escalado" : ""}
+                                </SelectItem>
+                              );
+                            })
                           )}
                         </SelectContent>
                       </Select>
@@ -632,8 +658,8 @@ export default function LicaoDetalhe() {
           <AlertDialogHeader>
             <AlertDialogTitle>Finalizar lição?</AlertDialogTitle>
             <AlertDialogDescription>
-              Todas as turmas ativas já têm registro da EBD. Após confirmar, a lição ficará
-              encerrada (os registros das turmas continuam editáveis).
+              Todas as turmas ativas já concluíram a chamada. Após confirmar, a lição ficará
+              encerrada (as fichas continuam disponíveis para revisão).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -9,7 +9,10 @@ import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { isSomenteProfessor } from "@/lib/chamada";
+import {
+  isSomenteProfessor,
+  selecionarAlvoFrequenciaProfessor,
+} from "@/lib/chamada";
 import { licoesLicaoPath, licoesRegistroTurmaProfessorPath } from "@/lib/licoesRoutes";
 import {
   attendanceApi,
@@ -35,40 +38,34 @@ export default function FrequenciaProfessoresLicao() {
   const ano = Number(anoParam);
   const trimestre = Number(trimestreParam);
   const numeroLicao = Number(licaoNumeroParam);
+  const paramsValidos =
+    Number.isFinite(ano) &&
+    Number.isFinite(trimestre) &&
+    Number.isFinite(numeroLicao);
   const somenteProfessor = isSomenteProfessor({ isAdminSistema, hasRole });
   const podeMarcarPresencaProfessor = can("frequencia", "editar") || can("frequencia", "criar");
-  const [presencaLocal, setPresencaLocal] = useState<Record<number, boolean>>({});
+  const [presencaLocal, setPresencaLocal] = useState<Record<string, boolean>>({});
   const [salvandoProfessor, setSalvandoProfessor] = useState<Record<number, boolean>>({});
-
-  if (!Number.isFinite(ano) || !Number.isFinite(trimestre) || !Number.isFinite(numeroLicao)) {
-    return <Navigate to="/licoes" replace />;
-  }
-
-  if (somenteProfessor && loadingUsuario) {
-    return <RedirectSkeleton />;
-  }
-
-  if (somenteProfessor) {
-    const registroPath = licoesRegistroTurmaProfessorPath(ano, trimestre, numeroLicao, turmasProfessor);
-    return <Navigate to={registroPath ?? licoesLicaoPath(ano, trimestre, numeroLicao)} replace />;
-  }
+  const [turmaSelecionada, setTurmaSelecionada] = useState<Record<number, string>>({});
+  const podeConsultarPagina =
+    podeCarregarOperacional && paramsValidos && !somenteProfessor;
 
   const { data: licoes = [], isLoading: loadingLicao } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "licoes", trimestre, ano),
     queryFn: () => fetchLicoes({ trimestre, ano }),
-    enabled: podeCarregarOperacional,
+    enabled: podeConsultarPagina,
   });
 
   const { data: turmas = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "turmas"),
     queryFn: fetchTurmas,
-    enabled: podeCarregarOperacional,
+    enabled: podeConsultarPagina,
   });
 
   const { data: sheets = [] } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "attendance-sheets"),
     queryFn: fetchAttendanceSheets,
-    enabled: podeCarregarOperacional,
+    enabled: podeConsultarPagina,
   });
 
   const licao = licoes.find((item) => item.numero === numeroLicao);
@@ -83,7 +80,13 @@ export default function FrequenciaProfessoresLicao() {
         nome: string;
         turmas: string[];
         presente: boolean;
-        targets: Array<{ classGroupId: string; sheetId?: string; professorId: number }>;
+        targets: Array<{
+          classGroupId: string;
+          turmaNome: string;
+          sheetId?: string;
+          professorId: number;
+          presente: boolean;
+        }>;
       }
     >();
 
@@ -92,7 +95,13 @@ export default function FrequenciaProfessoresLicao() {
       turma.professorUsers.forEach((prof) => {
         const current = map.get(String(prof.id));
         const presenteNaTurma = sheet?.professor === prof.id ? Boolean(sheet.professorPresente) : false;
-        const target = { classGroupId: turma.id, sheetId: sheet?.id, professorId: prof.id };
+        const target = {
+          classGroupId: turma.id,
+          turmaNome: turma.nome,
+          sheetId: sheet?.id,
+          professorId: prof.id,
+          presente: presenteNaTurma,
+        };
 
         if (!current) {
           map.set(String(prof.id), {
@@ -117,30 +126,35 @@ export default function FrequenciaProfessoresLicao() {
   const marcarPresencaMutation = useMutation({
     mutationFn: async ({
       professorId,
-      targets,
+      target,
       presente,
     }: {
       professorId: number;
-      targets: Array<{ classGroupId: string; sheetId?: string; professorId: number }>;
+      target: {
+        classGroupId: string;
+        sheetId?: string;
+        professorId: number;
+      };
       presente: boolean;
     }) => {
       if (!lessonId) throw new Error("Lição inválida");
 
-      await Promise.all(
-        targets.map(async (target) => {
-          const sheet =
-            target.sheetId != null
-              ? { id: target.sheetId }
-              : await attendanceApi.ensureAttendanceSheet(lessonId, target.classGroupId, target.professorId);
-          await attendanceApi.updateAttendanceSheet(sheet.id, {
-            professor: target.professorId,
-            professorPresente: presente,
-          });
-        }),
-      );
+      const sheet =
+        target.sheetId != null
+          ? { id: target.sheetId }
+          : await attendanceApi.ensureAttendanceSheet(
+              lessonId,
+              target.classGroupId,
+              target.professorId,
+            );
+      await attendanceApi.updateAttendanceSheet(sheet.id, {
+        professor: target.professorId,
+        professorPresente: presente,
+      });
     },
-    onMutate: ({ professorId, presente }) => {
-      setPresencaLocal((prev) => ({ ...prev, [professorId]: presente }));
+    onMutate: ({ professorId, target, presente }) => {
+      const stateKey = `${professorId}:${target.classGroupId}`;
+      setPresencaLocal((prev) => ({ ...prev, [stateKey]: presente }));
       setSalvandoProfessor((prev) => ({ ...prev, [professorId]: true }));
     },
     onSuccess: (_, variables) => {
@@ -151,7 +165,9 @@ export default function FrequenciaProfessoresLicao() {
       setSalvandoProfessor((prev) => ({ ...prev, [variables.professorId]: false }));
       setPresencaLocal((prev) => {
         const next = { ...prev };
-        delete next[variables.professorId];
+        delete next[
+          `${variables.professorId}:${variables.target.classGroupId}`
+        ];
         return next;
       });
       toast.error("Não foi possível atualizar frequência dos professores.");
@@ -164,13 +180,39 @@ export default function FrequenciaProfessoresLicao() {
       return;
     }
     setPresencaLocal((prev) => {
-      const next: Record<number, boolean> = {};
+      const next: Record<string, boolean> = {};
       professores.forEach((professor) => {
-        next[professor.id] = prev[professor.id] ?? professor.presente;
+        professor.targets.forEach((target) => {
+          const stateKey = `${professor.id}:${target.classGroupId}`;
+          next[stateKey] = prev[stateKey] ?? target.presente;
+        });
       });
       return next;
     });
   }, [professores]);
+
+  if (!paramsValidos) {
+    return <Navigate to="/licoes" replace />;
+  }
+
+  if (somenteProfessor && loadingUsuario) {
+    return <RedirectSkeleton />;
+  }
+
+  if (somenteProfessor) {
+    const registroPath = licoesRegistroTurmaProfessorPath(
+      ano,
+      trimestre,
+      numeroLicao,
+      turmasProfessor,
+    );
+    return (
+      <Navigate
+        to={registroPath ?? licoesLicaoPath(ano, trimestre, numeroLicao)}
+        replace
+      />
+    );
+  }
 
   if (loadingLicao) {
     return <FrequenciaProfessoresSkeleton />;
@@ -207,34 +249,83 @@ export default function FrequenciaProfessoresLicao() {
               Nenhum professor vinculado às turmas desta igreja.
             </p>
           ) : (
-            professores.map((professor) => (
-              <div
-                key={professor.id}
-                className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-medium">{professor.nome}</p>
-                  <p className="text-xs text-muted-foreground">Turmas: {professor.turmas.join(", ")}</p>
+            professores.map((professor) => {
+              const target = selecionarAlvoFrequenciaProfessor(
+                professor.targets,
+                turmaSelecionada[professor.id],
+              );
+              const stateKey = target
+                ? `${professor.id}:${target.classGroupId}`
+                : null;
+              const presenteSelecionado =
+                target && stateKey
+                  ? (presencaLocal[stateKey] ?? target.presente)
+                  : false;
+              return (
+                <div
+                  key={professor.id}
+                  className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-medium">{professor.nome}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Turmas: {professor.turmas.join(", ")}
+                    </p>
+                  </div>
+                  {podeMarcarPresencaProfessor ? (
+                    <div className="flex items-center gap-3">
+                      {professor.targets.length > 1 ? (
+                        <select
+                          aria-label={`Turma para registrar a frequência de ${professor.nome}`}
+                          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                          value={turmaSelecionada[professor.id] ?? ""}
+                          disabled={Boolean(salvandoProfessor[professor.id])}
+                          onChange={(event) =>
+                            setTurmaSelecionada((prev) => ({
+                              ...prev,
+                              [professor.id]: event.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">Selecione a turma</option>
+                          {professor.targets.map((item) => (
+                            <option
+                              key={item.classGroupId}
+                              value={item.classGroupId}
+                            >
+                              {item.turmaNome}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      <Switch
+                        checked={presenteSelecionado}
+                        disabled={
+                          Boolean(salvandoProfessor[professor.id]) || !target
+                        }
+                        onCheckedChange={(checked) => {
+                          if (!target) {
+                            toast.info(
+                              "Selecione a turma antes de registrar a frequência.",
+                            );
+                            return;
+                          }
+                          marcarPresencaMutation.mutate({
+                            professorId: professor.id,
+                            target,
+                            presente: checked,
+                          });
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">
+                      {professor.presente ? "Presente" : "Ausente"}
+                    </span>
+                  )}
                 </div>
-                {podeMarcarPresencaProfessor ? (
-                  <Switch
-                    checked={presencaLocal[professor.id] ?? professor.presente}
-                    disabled={Boolean(salvandoProfessor[professor.id])}
-                    onCheckedChange={(checked) =>
-                      marcarPresencaMutation.mutate({
-                        professorId: professor.id,
-                        targets: professor.targets,
-                        presente: checked,
-                      })
-                    }
-                  />
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    {professor.presente ? "Presente" : "Ausente"}
-                  </span>
-                )}
-              </div>
-            ))
+              );
+            })
           )}
         </CardContent>
       </Card>

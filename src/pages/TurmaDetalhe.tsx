@@ -81,14 +81,14 @@ export default function TurmaDetalhe() {
     [alunos, id],
   );
 
-  // O backend só aceita um vínculo por professor, então quem já leciona em
-  // qualquer turma da igreja fica fora da lista de candidatos.
   const professoresDisponiveis = useMemo(() => {
-    const jaVinculados = new Set(
-      turmas.flatMap((t) => t.professorUsers.map((professor) => String(professor.id))),
+    const jaVinculadosNestaTurma = new Set(
+      turmaFromLista?.professorUsers.map((professor) => String(professor.id)) ?? [],
     );
-    return professoresIgreja.filter((professor) => !jaVinculados.has(professor.id));
-  }, [professoresIgreja, turmas]);
+    return professoresIgreja.filter(
+      (professor) => !jaVinculadosNestaTurma.has(professor.id),
+    );
+  }, [professoresIgreja, turmaFromLista]);
 
   function invalidarTurmas() {
     void queryClient.invalidateQueries({ queryKey: ["turmas"] });
@@ -322,15 +322,15 @@ export default function TurmaDetalhe() {
           <DialogHeader>
             <DialogTitle>Adicionar professor</DialogTitle>
             <DialogDescription>
-              Escolha um professor desta igreja para lecionar em {turma.nome}. Só aparecem
-              professores que ainda não estão em outra turma.
+              Escolha um professor desta igreja para lecionar em {turma.nome}. Um professor
+              pode participar de mais de uma turma.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             {professoresDisponiveis.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nenhum professor disponível. Cadastre um usuário com o perfil Professor em
-                Usuários, ou libere um professor que já esteja em outra turma.
+                Usuários ou verifique se todos já estão vinculados a esta turma.
               </p>
             ) : (
               <Select value={professorSelecionado} onValueChange={setProfessorSelecionado}>

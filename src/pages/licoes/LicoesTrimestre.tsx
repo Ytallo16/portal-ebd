@@ -23,15 +23,13 @@ export default function LicoesTrimestre() {
 
   const ano = Number(anoParam);
   const trimestre = Number(trimestreParam);
-
-  if (!Number.isFinite(ano) || !Number.isFinite(trimestre) || trimestre < 1) {
-    return <Navigate to="/licoes" replace />;
-  }
+  const paramsValidos =
+    Number.isFinite(ano) && Number.isFinite(trimestre) && trimestre >= 1;
 
   const { data: trimestres = [], isLoading: loadingMeta } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "trimestres"),
-    queryFn: fetchTrimestres,
-    enabled: podeCarregarOperacional,
+    queryFn: () => fetchTrimestres(),
+    enabled: podeCarregarOperacional && paramsValidos,
   });
 
   const trimestreMeta = trimestres.find((t) => t.numero === trimestre && t.ano === ano);
@@ -39,7 +37,7 @@ export default function LicoesTrimestre() {
   const { data: licoes = [], isLoading: loadingLicoes } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "licoes", trimestre, ano),
     queryFn: () => fetchLicoes({ trimestre, ano }),
-    enabled: podeCarregarOperacional,
+    enabled: podeCarregarOperacional && paramsValidos,
   });
 
   const quantidadeLicoes = trimestreMeta?.quantidadeLicoes ?? 13;
@@ -54,6 +52,10 @@ export default function LicoesTrimestre() {
       }),
     [quantidadeLicoes, licoesPorNumero],
   );
+
+  if (!paramsValidos) {
+    return <Navigate to="/licoes" replace />;
+  }
 
   if (loadingMeta || loadingLicoes) {
     return <LicoesTrimestreSkeleton />;

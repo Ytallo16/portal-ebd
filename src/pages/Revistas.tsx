@@ -88,7 +88,7 @@ export default function Revistas() {
 
   const { data: trimestres = [], isLoading: loadingTrimestres } = useQuery({
     queryKey: orgQueryKey(activeOrgId, "trimestres"),
-    queryFn: fetchTrimestres,
+    queryFn: () => fetchTrimestres(),
     enabled: podeCarregarOperacional,
   });
 

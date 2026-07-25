@@ -109,6 +109,10 @@ export type Aluno = {
   email: string;
   telefone: string;
   turmaId: string;
+  isActive: boolean;
+  deletedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   endereco: {
     cep: string;
     rua: string;
@@ -119,6 +123,91 @@ export type Aluno = {
     uf: string;
   };
   responsaveis?: { nome: string; telefone: string }[];
+};
+
+export type ResultadoImportacaoAluno = {
+  linha: number;
+  nome: string;
+  status:
+    | "VALIDO"
+    | "INVALIDO"
+    | "CADASTRADO"
+    | "NAO_CADASTRADO"
+    | "DESFEITO"
+    | "NAO_DESFEITO";
+  motivos: string[];
+  aluno_id: number | null;
+};
+
+export type ResultadoImportacaoAlunos = {
+  fase: "VALIDACAO" | "CONFIRMACAO" | "DESFAZIMENTO";
+  lote_id: string;
+  status_lote:
+    | "INVALID"
+    | "VALIDATED"
+    | "CONFIRMED"
+    | "UNDONE"
+    | "PARTIALLY_UNDONE";
+  arquivo_nome: string;
+  total_linhas: number;
+  validos: number;
+  invalidos: number;
+  cadastrados: number;
+  nao_cadastrados: number;
+  desativados: number;
+  nao_desfeitos: number;
+  colunas_obrigatorias: string[];
+  colunas_ausentes: string[];
+  colunas_ignoradas: string[];
+  erros_arquivo: string[];
+  pode_confirmar: boolean;
+  pode_desfazer: boolean;
+  criado_em: string;
+  confirmado_em: string | null;
+  desfeito_em: string | null;
+  resultados: ResultadoImportacaoAluno[];
+};
+
+export type LoteImportacaoAlunos = {
+  lote_id: string;
+  arquivo_nome: string;
+  status_lote: ResultadoImportacaoAlunos["status_lote"];
+  total_linhas: number;
+  validos: number;
+  invalidos: number;
+  cadastrados: number;
+  pode_confirmar: boolean;
+  pode_desfazer: boolean;
+  criado_em: string;
+  confirmado_em: string | null;
+  desfeito_em: string | null;
+  criado_por: string | null;
+  confirmado_por: string | null;
+  desfeito_por: string | null;
+};
+
+export type HistoricoAluno = {
+  id: number;
+  action:
+    | "CREATED"
+    | "UPDATED"
+    | "DEACTIVATED"
+    | "RESTORED"
+    | "IMPORTED"
+    | "IMPORT_UNDONE";
+  action_label: string;
+  actor_name: string | null;
+  changes: Record<string, { antes: unknown; depois: unknown }>;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export type PaginaAlunos = {
+  items: Aluno[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 };
 
 export type Licao = {
@@ -291,6 +380,7 @@ export type OrganizacaoContexto = {
 };
 
 export type UsuarioLogado = {
+  id: string;
   nome: string;
   email: string;
   fotoUrl: string | null;
@@ -328,6 +418,7 @@ export type AttendanceSheet = {
   id: string;
   lesson: string;
   classGroup: string;
+  status: "RASCUNHO" | "CONCLUIDA";
   professor?: number | null;
   professorPresente?: boolean;
   visitantes: number;
@@ -354,8 +445,7 @@ function mapStatus(status: string): "Aberta" | "Finalizada" {
 }
 
 export async function fetchTurmas(): Promise<Turma[]> {
-  const data = await request<unknown>("/classes/");
-  const items = getResults<any>(data);
+  const items = await requestAllPages<any>("/classes/");
   return items.map((item) => ({
     id: String(item.id),
     nome: item.nome,
@@ -397,16 +487,11 @@ export async function updateTurma(id: string, payload: TurmaPayload) {
 }
 
 export async function fetchProfessoresIgreja(): Promise<Array<{ id: string; nome: string }>> {
-  const data = await request<unknown>("/users/");
-  const items = getResults<any>(data);
-  return items
-    .filter((item) =>
-      (item.papeis ?? []).some((papel: string) => papel.trim().toUpperCase() === "PROFESSOR"),
-    )
-    .map((item) => ({
-      id: String(item.id),
-      nome: item.nome,
-    }));
+  const items = await requestAllPages<any>("/users/?role=PROFESSOR");
+  return items.map((item) => ({
+    id: String(item.id),
+    nome: item.nome,
+  }));
 }
 
 export async function addProfessorTurma(classGroupId: string, userId: string) {
@@ -432,6 +517,10 @@ function mapAluno(item: any): Aluno {
     email: item.email ?? "",
     telefone: item.telefone ?? "",
     turmaId: item.class_group ? String(item.class_group) : "",
+    isActive: item.is_active !== false,
+    deletedAt: item.deleted_at ?? null,
+    createdAt: item.created_at ?? null,
+    updatedAt: item.updated_at ?? null,
     endereco: {
       cep: item.endereco?.cep ?? "",
       rua: item.endereco?.rua ?? "",
@@ -454,6 +543,41 @@ export async function fetchAlunos(search = ""): Promise<Aluno[]> {
   return items.map(mapAluno);
 }
 
+export async function fetchAlunosInativos(): Promise<Aluno[]> {
+  const items = await requestAllPages<any>("/students/inactive/");
+  return items.map(mapAluno);
+}
+
+export async function fetchAlunosPage(filters: {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  inativos?: boolean;
+  classId?: string;
+} = {}): Promise<PaginaAlunos> {
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 24));
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.classId) params.set("class_id", filters.classId);
+  const endpoint = filters.inativos ? "/students/inactive/" : "/students/";
+  const data = await request<{
+    count: number;
+    results: any[];
+  }>(`${endpoint}?${params.toString()}`);
+  const total = Number(data.count ?? 0);
+  return {
+    items: (data.results ?? []).map(mapAluno),
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 export async function createAluno(payload: {
   nome: string;
   sexo: "M" | "F";
@@ -474,6 +598,54 @@ export async function createAluno(payload: {
       ativo: true,
     }),
   });
+}
+
+export async function importarAlunosEmLote(
+  arquivo: File,
+): Promise<ResultadoImportacaoAlunos> {
+  const formData = new FormData();
+  formData.append("arquivo", arquivo);
+  return request<ResultadoImportacaoAlunos>("/students/import/", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export async function confirmarImportacaoAlunos(
+  loteId: string,
+): Promise<ResultadoImportacaoAlunos> {
+  return request<ResultadoImportacaoAlunos>(
+    `/students/import/${encodeURIComponent(loteId)}/confirm/`,
+    { method: "POST" },
+  );
+}
+
+export async function desfazerImportacaoAlunos(
+  loteId: string,
+): Promise<ResultadoImportacaoAlunos> {
+  return request<ResultadoImportacaoAlunos>(
+    `/students/import/${encodeURIComponent(loteId)}/undo/`,
+    { method: "POST" },
+  );
+}
+
+export async function fetchHistoricoImportacoesAlunos(): Promise<LoteImportacaoAlunos[]> {
+  const items = await requestAllPages<LoteImportacaoAlunos>("/students/imports/");
+  return items;
+}
+
+export async function restoreAluno(id: string, turmaId?: string): Promise<Aluno> {
+  const data = await request<any>(`/students/${id}/restore/`, {
+    method: "POST",
+    body: JSON.stringify(
+      turmaId ? { class_group: Number(turmaId) } : {},
+    ),
+  });
+  return mapAluno(data);
+}
+
+export async function fetchHistoricoAluno(id: string): Promise<HistoricoAluno[]> {
+  return requestAllPages<HistoricoAluno>(`/students/${id}/history/`);
 }
 
 export async function updateAluno(
@@ -741,6 +913,7 @@ function mapAttendanceSheet(item: any): AttendanceSheet {
     id: String(item.id),
     lesson: String(item.lesson),
     classGroup: String(item.class_group),
+    status: item.status === "CONCLUIDA" ? "CONCLUIDA" : "RASCUNHO",
     professor: item.professor ?? null,
     professorPresente: Boolean(item.professor_presente),
     visitantes: item.visitantes ?? 0,
@@ -765,11 +938,45 @@ export async function fetchAttendanceByLessonClass(
     const data = await request<any>(`/lessons/${lessonId}/classes/${classId}/attendance`);
     return mapAttendanceSheet(data);
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
+    if (error instanceof ApiError && error.status === 404) {
       return null;
     }
     throw error;
   }
+}
+
+export async function saveAttendanceRegistration(payload: {
+  lessonId: string;
+  classGroupId: string;
+  status: "RASCUNHO" | "CONCLUIDA";
+  professor?: number | null;
+  professorPresente?: boolean;
+  visitantes: number;
+  biblias: number;
+  revistas: number;
+  ofertaValor: number;
+  records: Array<{ student: string; presente: boolean }>;
+}): Promise<AttendanceSheet> {
+  const data = await request<any>(
+    `/lessons/${payload.lessonId}/classes/${payload.classGroupId}/attendance`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        status: payload.status,
+        professor: payload.professor ?? null,
+        professor_presente: payload.professorPresente ?? false,
+        visitantes: payload.visitantes,
+        biblias: payload.biblias,
+        revistas: payload.revistas,
+        oferta_valor: String(payload.ofertaValor),
+        records: payload.records.map((record) => ({
+          student: Number(record.student),
+          presente: record.presente,
+        })),
+      }),
+    },
+  );
+  return mapAttendanceSheet(data);
 }
 
 export async function fetchAttendanceSheets(): Promise<AttendanceSheet[]> {
@@ -1117,8 +1324,50 @@ function mapUsuario(item: any): Usuario {
 }
 
 export async function fetchUsuarios(): Promise<Usuario[]> {
-  const data = await request<unknown>("/users/");
-  return getResults<any>(data).map(mapUsuario);
+  const items = await requestAllPages<any>("/users/");
+  return items.map(mapUsuario);
+}
+
+export type UsuariosPage = {
+  items: Usuario[];
+  count: number;
+  page: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
+export async function fetchUsuariosPage(filters: {
+  page?: number;
+  search?: string;
+} = {}): Promise<UsuariosPage> {
+  const page = filters.page ?? 1;
+  const params = new URLSearchParams({ page: String(page) });
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  const data = await request<any>(`/users/?${params.toString()}`);
+  const count = Number(data.count ?? 0);
+  const pageSize = Math.max(getResults<any>(data).length, 20);
+  return {
+    items: getResults<any>(data).map(mapUsuario),
+    count,
+    page,
+    totalPages: Math.max(1, Math.ceil(count / pageSize)),
+    hasNext: Boolean(data.next),
+    hasPrevious: Boolean(data.previous),
+  };
+}
+
+export async function fetchUsuariosStats(): Promise<{
+  total: number;
+  ativos: number;
+  inativos: number;
+}> {
+  const data = await request<any>("/users/stats/");
+  return {
+    total: Number(data.total ?? 0),
+    ativos: Number(data.ativos ?? 0),
+    inativos: Number(data.inativos ?? 0),
+  };
 }
 
 export async function toggleUserActive(userId: string) {
@@ -1187,6 +1436,7 @@ export async function fetchUsuarioLogado(): Promise<UsuarioLogado> {
     : [];
 
   return {
+    id: String(me.id),
     nome: me.nome,
     email: me.email,
     fotoUrl: me.foto_url?.trim() ? me.foto_url : null,
@@ -1269,6 +1519,57 @@ export async function fetchDashboardBirthdays() {
   return request<any[]>("/dashboard/birthdays");
 }
 
+export type DashboardAction = {
+  id: string;
+  kind:
+    | "ATTENDANCE_PENDING"
+    | "LESSON_TODAY"
+    | "LESSON_FINALIZE"
+    | "MAGAZINE_PAYMENT";
+  title: string;
+  body: string;
+  actionPath: string;
+  severity: "INFO" | "WARNING";
+  organizationId: number;
+  organizationName: string;
+  metadata: Record<string, unknown>;
+};
+
+export type DashboardActionsResponse = {
+  results: DashboardAction[];
+  total: number;
+  summaryByOrganization: Array<{
+    organizationId: number;
+    organizationName: string;
+    pendingCount: number;
+    warningCount: number;
+  }>;
+};
+
+export async function fetchDashboardActions(): Promise<DashboardActionsResponse> {
+  const data = await request<any>("/dashboard/actions");
+  return {
+    results: (data.results ?? []).map((item: any) => ({
+      id: String(item.id),
+      kind: item.kind,
+      title: item.title,
+      body: item.body,
+      actionPath: item.action_path,
+      severity: item.severity,
+      organizationId: Number(item.organization_id),
+      organizationName: item.organization_name,
+      metadata: item.metadata ?? {},
+    })),
+    total: Number(data.total ?? 0),
+    summaryByOrganization: (data.summary_by_organization ?? []).map((item: any) => ({
+      organizationId: Number(item.organization_id),
+      organizationName: item.organization_name,
+      pendingCount: Number(item.pending_count ?? 0),
+      warningCount: Number(item.warning_count ?? 0),
+    })),
+  };
+}
+
 export type ProfessorDashboardTurmaResumo = {
   id: number;
   nome: string;
@@ -1285,6 +1586,18 @@ export type ProfessorDashboardLicaoResumo = {
   registrada?: boolean;
 };
 
+export type ProfessorDashboardLicaoHoje = {
+  id: number;
+  numero: number;
+  tema: string;
+  data: string;
+  trimestre: number;
+  ano: number;
+  turmaId: number;
+  turmaNome: string;
+  registrada: boolean;
+};
+
 export type ProfessorDashboard = {
   turmasDisponiveis: ProfessorDashboardTurmaResumo[];
   turma: ProfessorDashboardTurmaResumo & { totalAlunos: number };
@@ -1297,6 +1610,7 @@ export type ProfessorDashboard = {
     visitantesTrimestre: number;
   };
   proximaLicao: ProfessorDashboardLicaoResumo | null;
+  licoesHoje: ProfessorDashboardLicaoHoje[];
   ultimoRegistro: {
     licaoNumero: number;
     licaoTema: string;
@@ -1376,6 +1690,17 @@ function mapProfessorDashboard(data: any): ProfessorDashboard {
           registrada: Boolean(data.proxima_licao.registrada),
         }
       : null,
+    licoesHoje: (data.licoes_hoje ?? []).map((licao: any) => ({
+      id: licao.id,
+      numero: licao.numero,
+      tema: licao.tema,
+      data: licao.data,
+      trimestre: licao.trimestre,
+      ano: licao.ano,
+      turmaId: licao.turma_id,
+      turmaNome: licao.turma_nome,
+      registrada: Boolean(licao.registrada),
+    })),
     ultimoRegistro: data.ultimo_registro
       ? {
           licaoNumero: data.ultimo_registro.licao_numero,
@@ -1668,9 +1993,17 @@ export async function fetchIgrejasDaInstancia(campoId: string, includeInactive =
 
 export const studentsApi = {
   fetchAlunos,
+  fetchAlunosInativos,
+  fetchAlunosPage,
   createAluno,
+  importarAlunosEmLote,
+  confirmarImportacaoAlunos,
+  desfazerImportacaoAlunos,
+  fetchHistoricoImportacoesAlunos,
   updateAluno,
   deleteAluno,
+  restoreAluno,
+  fetchHistoricoAluno,
   buildMatriculadosAlunos,
 };
 
@@ -1684,6 +2017,7 @@ export const teachersApi = {
 export const attendanceApi = {
   fetchAttendanceByLessonClass,
   fetchAttendanceSheets,
+  saveAttendanceRegistration,
   createAttendanceSheet,
   updateAttendanceSheet,
   saveAttendanceRecords,

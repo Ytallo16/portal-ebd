@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { History, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -36,6 +36,8 @@ import { formatDate, formatarCep, formatarTelefone, getIniciais } from "@/lib/fo
 import { buscarEnderecoPorCep } from "@/lib/viacep";
 import {
   deleteAluno,
+  fetchHistoricoAluno,
+  restoreAluno,
   updateAluno,
   type Aluno,
   type Turma,
@@ -86,12 +88,27 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
+const CAMPOS_HISTORICO: Record<string, string> = {
+  nome: "Nome",
+  sexo: "Sexo",
+  data_nascimento: "Nascimento",
+  email: "E-mail",
+  telefone: "Telefone",
+  class_group_id: "Turma",
+  class_group_nome: "Nome da turma",
+  endereco: "Endereço",
+  responsaveis: "Responsáveis",
+  is_active: "Situação",
+  ativo: "Situação operacional",
+};
+
 type AlunoDetalheModalProps = {
   aluno: Aluno;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   podeEditar: boolean;
   podeExcluir: boolean;
+  podeRestaurar: boolean;
   somenteProfessor: boolean;
   turmasFormulario: Turma[];
   turmaNameById: Map<string, string>;
@@ -104,6 +121,7 @@ export function AlunoDetalheModal({
   onOpenChange,
   podeEditar,
   podeExcluir,
+  podeRestaurar,
   somenteProfessor,
   turmasFormulario,
   turmaNameById,
@@ -114,6 +132,11 @@ export function AlunoDetalheModal({
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const ultimoCepBuscado = useRef("");
+  const { data: historico = [], isLoading: carregandoHistorico } = useQuery({
+    queryKey: ["alunos", aluno.id, "historico"],
+    queryFn: () => fetchHistoricoAluno(aluno.id),
+    enabled: open,
+  });
 
   useEffect(() => {
     setForm(alunoParaForm(aluno));
@@ -147,14 +170,32 @@ export function AlunoDetalheModal({
     mutationFn: () => deleteAluno(aluno.id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["alunos"] });
-      toast.success("Aluno excluído.");
+      void queryClient.invalidateQueries({ queryKey: ["turmas"] });
+      toast.success("Aluno inativado. O histórico de frequência foi preservado.");
       onOpenChange(false);
     },
-    onError: () => toast.error("Não foi possível excluir o aluno."),
+    onError: () => toast.error("Não foi possível inativar o aluno."),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => restoreAluno(aluno.id, form.turmaId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["alunos"] });
+      void queryClient.invalidateQueries({ queryKey: ["turmas"] });
+      toast.success("Aluno restaurado.");
+      onOpenChange(false);
+    },
+    onError: () =>
+      toast.error(
+        "Não foi possível restaurar o aluno. Verifique se a turma continua ativa.",
+      ),
   });
 
   const nomeTurma = turmaNameById.get(aluno.turmaId) ?? "";
   const faixaEtariaTurma = turmaFaixaEtariaById.get(aluno.turmaId) ?? "";
+  const turmaRestauracaoValida = turmasFormulario.some(
+    (turma) => turma.id === form.turmaId,
+  );
   const exibeResponsaveis =
     turmaExigeResponsavel(faixaEtariaTurma, nomeTurma) &&
     aluno.responsaveis &&
@@ -240,6 +281,37 @@ export function AlunoDetalheModal({
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="space-y-6 overflow-y-auto px-6 py-5 text-sm">
             <Secao titulo="Identificação">
+              {!aluno.isActive && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  Cadastro inativo desde{" "}
+                  {aluno.deletedAt
+                    ? new Date(aluno.deletedAt).toLocaleDateString("pt-BR")
+                    : "data não informada"}.
+                  As frequências anteriores continuam preservadas.
+                </div>
+              )}
+              {podeRestaurar && (
+                <div className="space-y-1.5">
+                  <Label>Turma ao restaurar</Label>
+                  <Select
+                    value={turmaRestauracaoValida ? form.turmaId : undefined}
+                    onValueChange={(turmaId) =>
+                      setForm((current) => ({ ...current, turmaId }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma turma ativa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {turmasFormulario.map((turma) => (
+                        <SelectItem key={turma.id} value={turma.id}>
+                          {turma.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {podeEditar ? (
                 <>
                   <div className="space-y-1.5">
@@ -473,38 +545,100 @@ export function AlunoDetalheModal({
                 </div>
               </Secao>
             )}
+
+            <Secao titulo="Histórico de alterações">
+              {carregandoHistorico ? (
+                <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+              ) : historico.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma alteração registrada ainda.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {historico.map((evento) => {
+                    const campos = Object.keys(evento.changes)
+                      .map((campo) => CAMPOS_HISTORICO[campo] ?? campo)
+                      .join(", ");
+                    return (
+                      <div
+                        key={evento.id}
+                        className="flex gap-3 rounded-lg border border-border/60 px-3 py-2.5"
+                      >
+                        <History className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="font-medium">{evento.action_label}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Intl.DateTimeFormat("pt-BR", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            }).format(new Date(evento.created_at))}
+                            {" · "}
+                            {evento.actor_name || "Sistema"}
+                          </p>
+                          {campos && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Campos: {campos}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Secao>
           </div>
 
-          {(podeEditar || podeExcluir) && (
+          {(podeEditar || podeExcluir || podeRestaurar) && (
             <DialogFooter className="border-t px-6 py-4 sm:justify-between">
               {podeExcluir ? (
                 <Button
                   type="button"
                   variant="destructive"
                   size="icon"
-                  title="Excluir aluno"
-                  disabled={deleteMutation.isPending || updateMutation.isPending}
+                  title="Inativar aluno"
+                  disabled={
+                    deleteMutation.isPending ||
+                    updateMutation.isPending ||
+                    restoreMutation.isPending
+                  }
                   onClick={() => setConfirmDeleteOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Excluir aluno</span>
+                  <span className="sr-only">Inativar aluno</span>
                 </Button>
               ) : (
                 <span />
               )}
-              {podeEditar && (
-                <Button
-                  type="submit"
-                  disabled={
-                    updateMutation.isPending ||
-                    deleteMutation.isPending ||
-                    !form.nome.trim() ||
-                    !form.dataNascimento
-                  }
-                >
-                  {updateMutation.isPending ? "Salvando..." : "Salvar"}
-                </Button>
-              )}
+              <div className="flex gap-2">
+                {podeRestaurar && (
+                  <Button
+                    type="button"
+                    disabled={restoreMutation.isPending || !turmaRestauracaoValida}
+                    onClick={() => restoreMutation.mutate()}
+                  >
+                    {restoreMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                    )}
+                    Restaurar aluno
+                  </Button>
+                )}
+                {podeEditar && (
+                  <Button
+                    type="submit"
+                    disabled={
+                      updateMutation.isPending ||
+                      deleteMutation.isPending ||
+                      !form.nome.trim() ||
+                      !form.dataNascimento
+                    }
+                  >
+                    {updateMutation.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                )}
+              </div>
             </DialogFooter>
           )}
         </form>
@@ -514,9 +648,10 @@ export function AlunoDetalheModal({
     <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Excluir aluno?</AlertDialogTitle>
+          <AlertDialogTitle>Inativar aluno?</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja excluir {aluno.nome}? Esta ação não pode ser desfeita.
+            {aluno.nome} deixará de aparecer nas listas ativas, mas poderá ser
+            restaurado depois. Todas as frequências e o histórico serão preservados.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -526,7 +661,7 @@ export function AlunoDetalheModal({
             disabled={deleteMutation.isPending}
             onClick={() => deleteMutation.mutate()}
           >
-            {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            {deleteMutation.isPending ? "Inativando..." : "Inativar"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

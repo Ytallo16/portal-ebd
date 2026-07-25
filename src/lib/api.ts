@@ -33,10 +33,28 @@ const FETCH_WITH_COOKIES: RequestCredentials = "include";
 
 function parseApiErrorBody(text: string): { detail: string; code?: string } {
   try {
-    const json = JSON.parse(text) as { detail?: string; code?: string };
+    const json = JSON.parse(text) as { detail?: unknown; code?: string };
     if (json && typeof json === "object") {
+      const messages: string[] = [];
+      const collect = (value: unknown, prefix = "") => {
+        if (typeof value === "string") {
+          messages.push(prefix ? `${prefix}: ${value}` : value);
+          return;
+        }
+        if (Array.isArray(value)) {
+          value.forEach((item) => collect(item, prefix));
+          return;
+        }
+        if (value && typeof value === "object") {
+          Object.entries(value).forEach(([field, item]) => {
+            if (field === "code") return;
+            collect(item, field === "detail" ? prefix : prefix ? `${prefix}.${field}` : field);
+          });
+        }
+      };
+      collect(json);
       return {
-        detail: typeof json.detail === "string" ? json.detail : text || "Erro na requisição",
+        detail: messages.join(" · ") || text || "Erro na requisição",
         code: json.code,
       };
     }
@@ -158,12 +176,14 @@ function isIgrejaOperacional(tipo: string) {
 }
 
 /** Escolhe igreja operacional para professor/secretário de igreja. */
-function pickOperationalOrganizationId(me: {
+type OrganizationContextPayload = {
   papeis?: string[];
   papeis_detalhados?: Array<{ nome?: string; organization_id?: number | null }>;
   organizacao_ativa?: { id?: number } | null;
   organizacoes_disponiveis?: Array<{ id?: number; tipo?: string }>;
-}) {
+};
+
+function pickOperationalOrganizationId(me: OrganizationContextPayload) {
   const papeis = (me.papeis ?? []).map((p) => p.trim().toUpperCase());
   const disponiveis = Array.isArray(me.organizacoes_disponiveis) ? me.organizacoes_disponiveis : [];
   const igrejas = disponiveis.filter((o) => isIgrejaOperacional(o.tipo ?? ""));
@@ -213,7 +233,7 @@ export async function hydrateOrganizationContext(force = false) {
 
 async function doHydrateOrganizationContext() {
   try {
-    const me = await request<any>(
+    const me = await request<OrganizationContextPayload>(
       "/me",
       { method: "GET" },
       { ensureOrganization: false, skipOrganizationHeader: true },
