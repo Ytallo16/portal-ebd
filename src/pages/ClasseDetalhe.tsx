@@ -38,6 +38,7 @@ import {
   fetchTurmas,
   saveAttendanceRegistration,
 } from "@/lib/portalApi";
+import { AlunoDetalheModal } from "@/pages/AlunoDetalheModal";
 
 type PresencaMap = Record<string, boolean>;
 
@@ -79,6 +80,7 @@ export default function ClasseDetalhe() {
   const [professorId, setProfessorId] = useState<string>("");
   const [presencas, setPresencas] = useState<PresencaMap>({});
   const [edicaoIniciada, setEdicaoIniciada] = useState(false);
+  const [selectedAlunoId, setSelectedAlunoId] = useState<string | null>(null);
 
   const podeCriarFrequencia = can("frequencia", "criar");
   const podeAlterarFrequencia = can("frequencia", "editar");
@@ -133,6 +135,16 @@ export default function ClasseDetalhe() {
   const alunosDaTurma = useMemo(
     () => alunos.filter((a) => a.turmaId === classId),
     [alunos, classId],
+  );
+  const selectedAluno =
+    alunosDaTurma.find((aluno) => aluno.id === selectedAlunoId) ?? null;
+  const turmaNameById = useMemo(
+    () => new Map(turmas.map((item) => [item.id, item.nome])),
+    [turmas],
+  );
+  const turmaFaixaEtariaById = useMemo(
+    () => new Map(turmas.map((item) => [item.id, item.faixaEtaria])),
+    [turmas],
   );
   const alunosAtivosIds = useMemo(
     () => new Set(alunos.map((aluno) => aluno.id)),
@@ -529,7 +541,13 @@ export default function ClasseDetalhe() {
                         {getIniciais(aluno.nome)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-medium">{aluno.nome}</span>
+                    <button
+                      type="button"
+                      className="text-left font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      onClick={() => setSelectedAlunoId(aluno.id)}
+                    >
+                      {aluno.nome}
+                    </button>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
@@ -603,6 +621,23 @@ export default function ClasseDetalhe() {
             {licao.status === "Finalizada" ? "Salvar correção concluída" : "Concluir chamada"}
           </Button>
         </div>
+      )}
+
+      {selectedAluno && (
+        <AlunoDetalheModal
+          aluno={selectedAluno}
+          open
+          onOpenChange={(open) => {
+            if (!open) setSelectedAlunoId(null);
+          }}
+          podeEditar={false}
+          podeExcluir={false}
+          podeRestaurar={false}
+          somenteProfessor={isProfessor}
+          turmasFormulario={turmas}
+          turmaNameById={turmaNameById}
+          turmaFaixaEtariaById={turmaFaixaEtariaById}
+        />
       )}
     </div>
   );
