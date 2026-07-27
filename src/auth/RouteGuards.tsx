@@ -16,6 +16,7 @@ const routeModules: Array<{
   acao?: "visualizar";
   adminOnly?: boolean;
   gerenciarTrimestresOnly?: boolean;
+  requireOrganization?: boolean;
 }> = [
   { prefix: "/", modulo: "dashboard" },
   { prefix: "/licoes/gerenciar-trimestres", modulo: "licoes", gerenciarTrimestresOnly: true },
@@ -30,6 +31,12 @@ const routeModules: Array<{
   { prefix: "/revistas", modulo: "revistas" },
   { prefix: "/igrejas", modulo: "organizacoes" },
   { prefix: "/configuracoes/usuarios", modulo: "usuarios" },
+  {
+    prefix: "/configuracoes/registro-atividades",
+    modulo: "organizacoes",
+    adminOnly: true,
+    requireOrganization: true,
+  },
   { prefix: "/configuracoes/organizacoes", modulo: "organizacoes", adminOnly: true },
   { prefix: "/configuracoes", modulo: "usuarios" },
 ];
@@ -80,15 +87,23 @@ export function ProtectedRoute() {
   const aguardandoContexto =
     Boolean(usuarioLogado?.requerSelecaoContexto) && !usuarioLogado?.organizacaoAtiva;
 
+  const routePermission = resolveRoutePermission(location.pathname);
+
   if (aguardandoContexto) {
+    if (routePermission?.adminOnly && !isAdminSistema) {
+      return <Navigate to="/" replace />;
+    }
+    if (routePermission?.requireOrganization) {
+      return <Navigate to="/configuracoes/organizacoes" replace />;
+    }
     return <Outlet />;
   }
-
-  const routePermission = resolveRoutePermission(location.pathname);
 
   if (routePermission) {
     const semPermissaoAdmin =
       routePermission.adminOnly && !isAdminSistema;
+    const semOrganizacaoObrigatoria =
+      routePermission.requireOrganization && !usuarioLogado?.organizacaoAtiva;
     const semPermissaoGerenciarTrimestres =
       routePermission.gerenciarTrimestresOnly &&
       !podeGerenciarTrimestres({ isAdminSistema, hasRole });
@@ -98,7 +113,15 @@ export function ProtectedRoute() {
       !isAdminSistema &&
       !can(routePermission.modulo, routePermission.acao ?? "visualizar");
 
-    if (semPermissaoAdmin || semPermissaoGerenciarTrimestres || semPermissaoModulo) {
+    if (
+      semPermissaoAdmin ||
+      semOrganizacaoObrigatoria ||
+      semPermissaoGerenciarTrimestres ||
+      semPermissaoModulo
+    ) {
+      if (semOrganizacaoObrigatoria) {
+        return <Navigate to="/configuracoes/organizacoes" replace />;
+      }
       if (semPermissaoGerenciarTrimestres) {
         return <Navigate to="/licoes" replace />;
       }

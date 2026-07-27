@@ -210,6 +210,36 @@ export type PaginaAlunos = {
   totalPages: number;
 };
 
+export type RegistroAtividade = {
+  id: number;
+  organizationId: string;
+  organizationName: string;
+  actorName: string;
+  actorEmail: string;
+  action: string;
+  resource: string;
+  objectReference: string;
+  eventType: "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "REQUEST";
+  modelLabel: string;
+  changes: Record<string, { antes: unknown; depois: unknown }>;
+  method: "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  statusCode: number;
+  succeeded: boolean;
+  ipAddress: string;
+  userAgent: string;
+  createdAt: string;
+};
+
+export type PaginaRegistrosAtividade = {
+  items: RegistroAtividade[];
+  count: number;
+  page: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
 export type Licao = {
   id: string;
   numero: number;
@@ -646,6 +676,57 @@ export async function restoreAluno(id: string, turmaId?: string): Promise<Aluno>
 
 export async function fetchHistoricoAluno(id: string): Promise<HistoricoAluno[]> {
   return requestAllPages<HistoricoAluno>(`/students/${id}/history/`);
+}
+
+export async function fetchRegistrosAtividade(filters: {
+  page?: number;
+  search?: string;
+  result?: "all" | "success" | "failure";
+  eventType?: "all" | "CREATE" | "UPDATE" | "DELETE";
+  dateFrom?: string;
+  dateTo?: string;
+} = {}): Promise<PaginaRegistrosAtividade> {
+  const page = Math.max(1, filters.page ?? 1);
+  const params = new URLSearchParams({ page: String(page) });
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.result && filters.result !== "all") params.set("result", filters.result);
+  if (filters.eventType && filters.eventType !== "all") {
+    params.set("event_type", filters.eventType);
+  }
+  if (filters.dateFrom) params.set("date_from", filters.dateFrom);
+  if (filters.dateTo) params.set("date_to", filters.dateTo);
+
+  const data = await request<any>(`/activity-logs/?${params.toString()}`);
+  const rawItems = getResults<any>(data);
+  const count = Number(data.count ?? 0);
+  const pageSize = Math.max(rawItems.length, 20);
+  return {
+    items: rawItems.map((item) => ({
+      id: Number(item.id),
+      organizationId: String(item.organization),
+      organizationName: item.organization_name ?? "",
+      actorName: item.actor_name ?? "Sistema",
+      actorEmail: item.actor_email ?? "",
+      action: item.action ?? "Executou uma operação",
+      resource: item.resource ?? "Sistema",
+      objectReference: item.object_reference ?? "",
+      eventType: item.event_type ?? "REQUEST",
+      modelLabel: item.model_label ?? "",
+      changes: item.changes ?? {},
+      method: item.method,
+      path: item.path ?? "",
+      statusCode: Number(item.status_code ?? 0),
+      succeeded: Boolean(item.succeeded),
+      ipAddress: item.ip_address ?? "",
+      userAgent: item.user_agent ?? "",
+      createdAt: item.created_at,
+    })),
+    count,
+    page,
+    totalPages: Math.max(1, Math.ceil(count / pageSize)),
+    hasNext: Boolean(data.next),
+    hasPrevious: Boolean(data.previous),
+  };
 }
 
 export async function updateAluno(

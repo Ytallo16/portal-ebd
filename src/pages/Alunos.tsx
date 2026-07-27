@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import { formatarTelefone, getIniciais } from "@/lib/formatters";
 import { AlunosPageSkeleton } from "@/components/skeletons";
 import { AlunoDetalheModal } from "@/pages/AlunoDetalheModal";
 import { ImportarAlunosDialog } from "@/components/alunos/ImportarAlunosDialog";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export default function Alunos() {
   const queryClient = useQueryClient();
@@ -36,7 +37,7 @@ export default function Alunos() {
   const podeCriarMatriculado = can("alunos", "criar");
   const podeExcluirMatriculado = can("alunos", "excluir");
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const debouncedSearch = useDebouncedValue(search, 400);
   const [page, setPage] = useState(1);
   const [mostrarInativos, setMostrarInativos] = useState(false);
   const [selectedAlunoId, setSelectedAlunoId] = useState<string | null>(null);
@@ -62,17 +63,18 @@ export default function Alunos() {
       "alunos",
       "pagina",
       mostrarInativos,
-      deferredSearch,
+      debouncedSearch,
       page,
     ),
     queryFn: () =>
       fetchAlunosPage({
-        search: deferredSearch,
+        search: debouncedSearch,
         page,
         pageSize: 24,
         inativos: mostrarInativos,
       }),
     enabled: podeCarregarOperacional,
+    placeholderData: (previous) => previous,
   });
   const alunos = useMemo(() => paginaAlunos?.items ?? [], [paginaAlunos]);
   const createMutation = useMutation({
@@ -116,6 +118,10 @@ export default function Alunos() {
 
   const turmaNomeProfessorUnico =
     turmasProfessor.length === 1 ? turmasProfessor[0].nome : "";
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const turmasFormulario = somenteProfessor
     ? turmas.filter((t) => idsTurmasProfessor.has(t.id))
@@ -209,10 +215,7 @@ export default function Alunos() {
               : "Buscar por nome ou turma..."
           }
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           className="pl-10 touch-target"
         />
       </div>
