@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Building2,
+  ClipboardList,
 } from "lucide-react";
 import { useMemo } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -58,8 +59,17 @@ const configuracaoItems: Array<{
   icon: typeof LayoutDashboard;
   modulo: ModuloPermissao;
   adminOnly?: boolean;
+  requireOrganization?: boolean;
 }> = [
   { title: "Usuários", url: "/configuracoes/usuarios", icon: Users, modulo: "usuarios" },
+  {
+    title: "Registro de atividades",
+    url: "/configuracoes/registro-atividades",
+    icon: ClipboardList,
+    modulo: "organizacoes",
+    adminOnly: true,
+    requireOrganization: true,
+  },
   {
     title: "Organizações",
     url: "/configuracoes/organizacoes",
@@ -107,9 +117,10 @@ export function AppSidebar() {
   const configItems = useMemo(
     () =>
       configuracaoItems.filter((item) =>
-        item.adminOnly ? isAdminSistema : isAdminSistema || can(item.modulo, "visualizar"),
+        (item.adminOnly ? isAdminSistema : isAdminSistema || can(item.modulo, "visualizar")) &&
+        (!item.requireOrganization || Boolean(organizacaoAtiva)),
       ),
-    [can, isAdminSistema],
+    [can, isAdminSistema, organizacaoAtiva],
   );
   const settingsIsActive = location.pathname.startsWith("/configuracoes");
   const closeOnMobile = () => {

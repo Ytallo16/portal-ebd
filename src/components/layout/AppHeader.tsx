@@ -34,6 +34,7 @@ function getPageTitle(pathname: string, licoesOptions?: { somenteProfessor?: boo
   if (matchPath("/revistas", pathname)) return "Revistas";
   if (matchPath("/igrejas", pathname)) return "Igrejas";
   if (matchPath("/configuracoes/usuarios", pathname)) return "Usuários";
+  if (matchPath("/configuracoes/registro-atividades", pathname)) return "Registro de atividades";
   if (matchPath("/configuracoes/organizacoes/:id", pathname)) return "Organização";
   if (matchPath("/configuracoes/organizacoes", pathname)) return "Organizações";
   if (matchPath("/configuracoes", pathname)) return "Configurações";
@@ -68,6 +69,12 @@ function getBreadcrumbs(pathname: string, licoesOptions?: { somenteProfessor?: b
   if (matchPath("/configuracoes", pathname)) return [{ label: "Configurações" }];
   if (matchPath("/configuracoes/usuarios", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Usuários" }];
+  }
+  if (matchPath("/configuracoes/registro-atividades", pathname)) {
+    return [
+      { label: "Configurações", to: "/configuracoes" },
+      { label: "Registro de atividades" },
+    ];
   }
   if (matchPath("/configuracoes/organizacoes", pathname)) {
     return [{ label: "Configurações", to: "/configuracoes" }, { label: "Organizações" }];

@@ -37,6 +37,7 @@ const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
 const Usuarios = lazy(() => import("@/pages/Usuarios"));
 const Organizacoes = lazy(() => import("@/pages/Organizacoes"));
 const OrganizacaoDetalhe = lazy(() => import("@/pages/OrganizacaoDetalhe"));
+const RegistroAtividades = lazy(() => import("@/pages/RegistroAtividades"));
 const Igrejas = lazy(() => import("@/pages/Igrejas"));
 const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
 const Login = lazy(() => import("@/pages/Login"));
@@ -109,6 +110,7 @@ const App = () => (
                   <Route path="/configuracoes/usuarios" element={<Usuarios />} />
                   <Route path="/configuracoes/organizacoes" element={<Organizacoes />} />
                   <Route path="/configuracoes/organizacoes/:id" element={<OrganizacaoDetalhe />} />
+                  <Route path="/configuracoes/registro-atividades" element={<RegistroAtividades />} />
                   <Route path="/meu-perfil" element={<MeuPerfil />} />
                 </Route>
               </Route>
