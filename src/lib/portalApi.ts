@@ -2176,3 +2176,74 @@ export async function markAllNotificationsRead(): Promise<{ unreadCount: number 
   });
   return { unreadCount: Number(data.unread_count ?? 0) };
 }
+
+export type AnexoLicao = {
+  id: string;
+  licaoId: string;
+  nome: string;
+  descricao: string;
+  tamanho: number;
+  contentType: string;
+  url: string;
+  autorNome: string;
+  podeExcluir: boolean;
+  criadoEm: string;
+};
+
+type AnexoLicaoApi = {
+  id: number | string;
+  lesson: number | string;
+  nome_original: string;
+  descricao: string;
+  tamanho: number;
+  content_type: string;
+  arquivo_url: string;
+  autor_nome: string;
+  pode_excluir: boolean;
+  created_at: string;
+};
+
+function mapAnexoLicao(item: AnexoLicaoApi): AnexoLicao {
+  return {
+    id: String(item.id),
+    licaoId: String(item.lesson),
+    nome: item.nome_original,
+    descricao: item.descricao ?? "",
+    tamanho: item.tamanho ?? 0,
+    contentType: item.content_type ?? "",
+    url: item.arquivo_url,
+    autorNome: item.autor_nome ?? "",
+    podeExcluir: Boolean(item.pode_excluir),
+    criadoEm: item.created_at,
+  };
+}
+
+export async function fetchAnexosLicao(licaoId: string): Promise<AnexoLicao[]> {
+  const data = await request<unknown>(
+    `/lesson-attachments/?lesson_id=${encodeURIComponent(licaoId)}`,
+  );
+  return getResults<AnexoLicaoApi>(data).map(mapAnexoLicao);
+}
+
+export async function uploadAnexoLicao(
+  licaoId: string,
+  arquivo: File,
+  descricao = "",
+): Promise<AnexoLicao> {
+  const formData = new FormData();
+  formData.append("lesson", licaoId);
+  formData.append("arquivo", arquivo);
+  if (descricao) formData.append("descricao", descricao);
+
+  const data = await request<AnexoLicaoApi>("/lesson-attachments/", {
+    method: "POST",
+    body: formData,
+  });
+  return mapAnexoLicao(data);
+}
+
+export async function excluirAnexoLicao(anexoId: string): Promise<void> {
+  await request(`/lesson-attachments/${encodeURIComponent(anexoId)}/`, {
+    method: "DELETE",
+  });
+}
