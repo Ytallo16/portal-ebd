@@ -20,7 +20,7 @@ import {
 import { formatCurrency } from "@/lib/formatters";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, BarChart, Bar,
+  Cell, BarChart, Bar, LabelList,
 } from "recharts";
 
 export default function Dashboard() {
@@ -76,11 +76,15 @@ function DashboardIgreja() {
     ausentes: f.ausentes,
   }));
 
-  const composicaoPorClasse = classComposition.map((c: any, index: number) => ({
-    nome: c.nome,
-    valor: c.total,
-    cor: c.cor || ["#125A94", "#068CC3", "#0D9488", "#D946EF", "#F97316"][index % 5],
-  }));
+  const alunosPorTurma = classComposition
+    .map((c: any, index: number) => ({
+      nome: c.nome,
+      valor: c.total,
+      cor: c.cor || ["#125A94", "#068CC3", "#0D9488", "#D946EF", "#F97316"][index % 5],
+    }))
+    .sort((a, b) => b.valor - a.valor);
+
+  const totalAlunosEmTurmas = alunosPorTurma.reduce((acc, t) => acc + t.valor, 0);
 
   const ofertasMensais = offeringEvolution.map((o: any) => ({
     mes: new Date(`${o.data}T12:00:00`).toLocaleDateString("pt-BR", { month: "short" }),
@@ -154,32 +158,47 @@ function DashboardIgreja() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Composição por Classe</CardTitle>
+            <CardTitle className="text-base">Alunos por Turma</CardTitle>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <div className="chart-container w-full max-w-sm">
+          <CardContent>
+            <div
+              className="w-full min-w-0"
+              style={{ height: Math.max(200, alunosPorTurma.length * 28) }}
+            >
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={composicaoPorClasse.slice(0, 7)}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={90}
-                  dataKey="valor"
-                  nameKey="nome"
-                  label={({ nome, percent }) => `${String(nome).split(" ")[0]} ${(Number(percent) * 100).toFixed(0)}%`}
-                  labelLine={false}
-                  fontSize={10}
-                >
-                  {composicaoPorClasse.slice(0, 7).map((entry, idx) => (
+              <BarChart
+                data={alunosPorTurma}
+                layout="vertical"
+                margin={{ top: 4, right: 28, bottom: 4, left: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 10 }} allowDecimals={false} />
+                <YAxis
+                  type="category"
+                  dataKey="nome"
+                  tick={{ fontSize: 10 }}
+                  width={110}
+                  interval={0}
+                />
+                <Tooltip formatter={(v: number) => [`${v} aluno(s)`, "Matriculados"]} />
+                <Bar dataKey="valor" radius={[0, 4, 4, 0]} barSize={14}>
+                  {alunosPorTurma.map((entry, idx) => (
                     <Cell key={idx} fill={entry.cor} />
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+                  {/* cor fixa: a cor da turma vem do banco e pode ser clara demais para ler */}
+                  <LabelList
+                    dataKey="valor"
+                    position="right"
+                    fontSize={10}
+                    fill="hsl(var(--foreground))"
+                  />
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {totalAlunosEmTurmas} aluno(s) em {alunosPorTurma.length} turma(s)
+            </p>
           </CardContent>
         </Card>
       </div>
