@@ -19,6 +19,4 @@ Aplicação em `http://localhost:8080` (porta configurada no Vite).
 - `npm test` — testes (Vitest)
 - `npm run lint` — ESLint
 
-## API
 
-O backend Django fica em `../portal-ebd_api`. Configure a URL da API conforme o ambiente (variáveis em `src/lib/api.ts`).
