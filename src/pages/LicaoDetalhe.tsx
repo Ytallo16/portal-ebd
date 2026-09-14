@@ -14,6 +14,7 @@ import {
 
 import { LicaoDetalheSkeleton, RedirectSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
+import { LicaoAnexos } from "@/components/licoes/LicaoAnexos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -589,6 +590,10 @@ export default function LicaoDetalhe() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {lessonId && (
+        <LicaoAnexos licaoId={String(lessonId)} podeEnviar={can("licoes", "editar")} />
       )}
 
       <Card>
