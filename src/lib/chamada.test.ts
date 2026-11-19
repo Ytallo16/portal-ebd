@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  alteracoesPendentesProfessores,
   chamadaStatusLabel,
+  chavePresencaProfessor,
   getChamadaTurmaStatus,
-  selecionarAlvoFrequenciaProfessor,
+  presencaProfessoresDoServidor,
 } from "@/lib/chamada";
 import type { AttendanceSheet } from "@/lib/portalApi";
 
@@ -23,6 +25,7 @@ function sheet(
     ofertaValor: 0,
     finalizedAt,
     records: [],
+    teachers: [],
   };
 }
 
@@ -46,31 +49,98 @@ describe("status da chamada", () => {
   });
 });
 
-describe("alvo da frequência do professor", () => {
-  const adulto = {
-    classGroupId: "10",
-    turmaNome: "Adultos",
-    presente: true,
-  };
-  const jovem = {
-    classGroupId: "20",
-    turmaNome: "Jovens",
-    presente: false,
-  };
+describe("presença dos professores — estado do servidor", () => {
+  const turmas = [
+    {
+      id: "10",
+      professorUsers: [{ id: 1 }, { id: 2 }],
+    },
+    {
+      id: "20",
+      professorUsers: [{ id: 2 }],
+    },
+  ];
 
-  it("usa automaticamente a única turma disponível", () => {
-    expect(selecionarAlvoFrequenciaProfessor([adulto])).toBe(adulto);
+  it("lê a presença de cada professor da turma separadamente", () => {
+    const servidor = presencaProfessoresDoServidor({
+      turmas,
+      sheets: [
+        {
+          classGroup: "10",
+          teachers: [
+            { user: 1, presente: true },
+            { user: 2, presente: false },
+          ],
+        },
+      ],
+    });
+
+    expect(servidor[chavePresencaProfessor("10", 1)]).toBe(true);
+    expect(servidor[chavePresencaProfessor("10", 2)]).toBe(false);
   });
 
-  it("não escolhe implicitamente quando o professor possui várias turmas", () => {
+  it("mantém o mesmo professor independente em cada turma", () => {
+    const servidor = presencaProfessoresDoServidor({
+      turmas,
+      sheets: [
+        { classGroup: "10", teachers: [{ user: 2, presente: false }] },
+        { classGroup: "20", teachers: [{ user: 2, presente: true }] },
+      ],
+    });
+
+    expect(servidor[chavePresencaProfessor("10", 2)]).toBe(false);
+    expect(servidor[chavePresencaProfessor("20", 2)]).toBe(true);
+  });
+
+  it("usa o par legado da ficha quando ainda não há registro por professor", () => {
+    const servidor = presencaProfessoresDoServidor({
+      turmas,
+      sheets: [
+        {
+          classGroup: "10",
+          professor: 1,
+          professorPresente: true,
+          teachers: [],
+        },
+      ],
+    });
+
+    expect(servidor[chavePresencaProfessor("10", 1)]).toBe(true);
+    expect(servidor[chavePresencaProfessor("10", 2)]).toBe(false);
+  });
+
+  it("trata turma sem ficha como todos ausentes", () => {
+    const servidor = presencaProfessoresDoServidor({ turmas, sheets: [] });
+
+    expect(servidor[chavePresencaProfessor("10", 1)]).toBe(false);
+    expect(servidor[chavePresencaProfessor("20", 2)]).toBe(false);
+  });
+});
+
+describe("presença dos professores — alterações pendentes", () => {
+  const servidor = {
+    "10:1": true,
+    "10:2": false,
+  };
+
+  it("não acusa pendência quando o valor volta ao do servidor", () => {
     expect(
-      selecionarAlvoFrequenciaProfessor([adulto, jovem]),
-    ).toBeUndefined();
+      alteracoesPendentesProfessores(servidor, { "10:1": true }),
+    ).toEqual([]);
+  });
+
+  it("lista apenas as chaves que realmente mudaram", () => {
     expect(
-      selecionarAlvoFrequenciaProfessor([adulto, jovem], "20"),
-    ).toBe(jovem);
+      alteracoesPendentesProfessores(servidor, {
+        "10:1": false,
+        "10:2": false,
+      }),
+    ).toEqual(["10:1"]);
+  });
+
+  it("considera pendente marcar professor que o servidor não conhece", () => {
     expect(
-      selecionarAlvoFrequenciaProfessor([adulto, jovem], "20")?.presente,
-    ).toBe(false);
+      alteracoesPendentesProfessores(servidor, { "30:9": true }),
+    ).toEqual(["30:9"]);
   });
 });

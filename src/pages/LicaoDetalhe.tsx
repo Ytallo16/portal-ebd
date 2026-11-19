@@ -14,6 +14,7 @@ import {
 
 import { LicaoDetalheSkeleton, RedirectSkeleton } from "@/components/skeletons";
 import { orgQueryKey, usePermissions } from "@/auth/usePermissions";
+import { LicaoAnexos } from "@/components/licoes/LicaoAnexos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -134,9 +135,9 @@ export default function LicaoDetalhe() {
   });
 
   const { data: sheets = [] } = useQuery({
-    queryKey: orgQueryKey(activeOrgId, "attendance-sheets"),
-    queryFn: fetchAttendanceSheets,
-    enabled: podeCarregarOperacional && visaoSecretario,
+    queryKey: orgQueryKey(activeOrgId, "attendance-sheets", lessonId),
+    queryFn: () => fetchAttendanceSheets({ lesson: lessonId! }),
+    enabled: podeCarregarOperacional && visaoSecretario && Boolean(lessonId),
   });
 
   const podeEscalarProfessores =
@@ -589,6 +590,10 @@ export default function LicaoDetalhe() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {lessonId && (
+        <LicaoAnexos licaoId={String(lessonId)} podeEnviar={can("licoes", "editar")} />
       )}
 
       <Card>
