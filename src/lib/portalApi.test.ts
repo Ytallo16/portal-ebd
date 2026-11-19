@@ -8,6 +8,7 @@ import {
   confirmarImportacaoAlunos,
   desfazerImportacaoAlunos,
   fetchAlunosPage,
+  fetchAttendanceSheets,
   fetchProfessorDashboard,
   fetchTurmas,
   isInstanciaCampo,
@@ -15,6 +16,7 @@ import {
   isTipoCampo,
   isTipoIgreja,
   saveAttendanceRegistration,
+  saveAttendanceTeachers,
   updateTurma,
   type OrganizacaoContexto,
   type UsuarioLogado,
@@ -410,5 +412,133 @@ describe("menu Igrejas e seletor no header (admin)", () => {
     };
     expect(deveExibirMenuIgrejas({ ...adminBase, organizacaoAtiva: igrejaDoCampo })).toBe(false);
     expect(deveExibirSeletorIgrejasNoHeader(igrejaDoCampo)).toBe(true);
+  });
+});
+
+describe("frequência dos professores", () => {
+  const fetchMock = vi.fn();
+
+  function jsonResponse(body: unknown) {
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(body),
+      json: async () => body,
+    } as unknown as Response;
+  }
+
+  beforeEach(() => {
+    localStorage.setItem("portal_ebd_user_email", "sec@test.com");
+    localStorage.setItem("portal_ebd_org_id_sec@test.com", "7");
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it("filtra as fichas pela lição e segue todas as páginas", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          next: "http://api/attendance-sheets/?page=2",
+          results: [{ id: 1, lesson: 4, class_group: 8, status: "RASCUNHO" }],
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          next: null,
+          results: [{ id: 2, lesson: 4, class_group: 9, status: "RASCUNHO" }],
+        }),
+      );
+
+    const sheets = await fetchAttendanceSheets({ lesson: "4" });
+
+    expect(sheets.map((sheet) => sheet.id)).toEqual(["1", "2"]);
+    const urls = fetchMock.mock.calls.map(([url]) => url as string);
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).toContain("lesson=4");
+    expect(urls[0]).toContain("page=1");
+    expect(urls[1]).toContain("page=2");
+  });
+
+  it("mapeia a presença de cada professor da ficha", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        next: null,
+        results: [
+          {
+            id: 1,
+            lesson: 4,
+            class_group: 8,
+            status: "RASCUNHO",
+            teachers: [
+              { id: 10, user: 5, professor_nome: "João", presente: true },
+              { id: 11, user: 6, professor_nome: "Maria", presente: false },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const [sheet] = await fetchAttendanceSheets({ lesson: "4" });
+
+    expect(sheet.teachers).toEqual([
+      { id: "10", user: 5, professorNome: "João", presente: true },
+      { id: "11", user: 6, professorNome: "Maria", presente: false },
+    ]);
+  });
+
+  it("salva vários professores de uma vez no endpoint em lote", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        id: 12,
+        lesson: 4,
+        class_group: 8,
+        status: "RASCUNHO",
+        teachers: [{ id: 10, user: 5, professor_nome: "João", presente: true }],
+      }),
+    );
+
+    const result = await saveAttendanceTeachers("12", [
+      { user: 5, presente: true },
+      { user: 6, presente: false },
+    ]);
+
+    const [requestUrl, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(requestUrl).toContain("/attendance-sheets/12/teachers/");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      teachers: [
+        { user: 5, presente: true },
+        { user: 6, presente: false },
+      ],
+    });
+    expect(result.teachers).toEqual([
+      { id: "10", user: 5, professorNome: "João", presente: true },
+    ]);
+  });
+
+  it("não envia professor_presente quando a chamada dos alunos não informa", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ id: 12, lesson: 4, class_group: 8, status: "CONCLUIDA" }),
+    );
+
+    await saveAttendanceRegistration({
+      lessonId: "4",
+      classGroupId: "8",
+      status: "CONCLUIDA",
+      professor: 5,
+      visitantes: 0,
+      biblias: 0,
+      revistas: 0,
+      ofertaValor: 0,
+      records: [],
+    });
+
+    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).not.toHaveProperty("professor_presente");
   });
 });

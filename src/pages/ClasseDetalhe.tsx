@@ -226,7 +226,8 @@ export default function ClasseDetalhe() {
         classGroupId: classId,
         status,
         professor: professorId ? Number(professorId) : null,
-        professorPresente: sheet?.professorPresente ?? false,
+        // Não envia professorPresente: a frequência dos professores é salva na
+        // tela própria e não pode ser sobrescrita pela chamada dos alunos.
         visitantes,
         biblias,
         revistas,

@@ -15,13 +15,71 @@ export const chamadaStatusLabel: Record<ChamadaTurmaStatus, string> = {
   concluida: "Concluída",
 };
 
-export function selecionarAlvoFrequenciaProfessor<
-  T extends { classGroupId: string },
->(targets: T[], selectedClassGroupId?: string): T | undefined {
-  if (targets.length === 1) return targets[0];
-  if (!selectedClassGroupId) return undefined;
-  return targets.find(
-    (target) => target.classGroupId === selectedClassGroupId,
+/** Identifica a presença de um professor numa turma específica. */
+export function chavePresencaProfessor(turmaId: string, professorId: number) {
+  return `${turmaId}:${professorId}`;
+}
+
+type TurmaComProfessores = {
+  id: string;
+  professorUsers: Array<{ id: number }>;
+};
+
+type FichaComProfessores = {
+  classGroup: string;
+  professor?: number | null;
+  professorPresente?: boolean;
+  teachers: Array<{ user: number; presente: boolean }>;
+};
+
+/**
+ * Presença gravada no servidor para cada par (turma, professor).
+ *
+ * Sempre devolve uma entrada por professor de cada turma — ausente é `false`
+ * explícito, não `undefined`, para que a tela saiba distinguir "o servidor diz
+ * ausente" de "o usuário ainda não mexeu".
+ *
+ * Fichas antigas, sem registro por professor, caem no par legado
+ * (`professor`, `professorPresente`) da própria ficha.
+ */
+export function presencaProfessoresDoServidor({
+  turmas,
+  sheets,
+}: {
+  turmas: TurmaComProfessores[];
+  sheets: FichaComProfessores[];
+}): Record<string, boolean> {
+  const porTurma = new Map(sheets.map((sheet) => [sheet.classGroup, sheet]));
+  const presenca: Record<string, boolean> = {};
+
+  for (const turma of turmas) {
+    const sheet = porTurma.get(turma.id);
+    for (const professor of turma.professorUsers) {
+      const registro = sheet?.teachers.find(
+        (teacher) => teacher.user === professor.id,
+      );
+      const legado =
+        sheet?.professor === professor.id && Boolean(sheet?.professorPresente);
+      presenca[chavePresencaProfessor(turma.id, professor.id)] = registro
+        ? registro.presente
+        : legado;
+    }
+  }
+
+  return presenca;
+}
+
+/**
+ * Chaves em que a edição local difere do servidor. Comparar com o servidor —
+ * em vez de só olhar "tem edição?" — evita acusar pendência quando o usuário
+ * marca e desmarca o mesmo professor.
+ */
+export function alteracoesPendentesProfessores(
+  servidor: Record<string, boolean>,
+  edicoes: Record<string, boolean>,
+): string[] {
+  return Object.keys(edicoes).filter(
+    (chave) => edicoes[chave] !== (servidor[chave] ?? false),
   );
 }
 

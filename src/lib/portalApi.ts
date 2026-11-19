@@ -457,6 +457,12 @@ export type AttendanceSheet = {
   ofertaValor: number;
   finalizedAt?: string | null;
   records: Array<{ id: string; student: string; alunoNome: string; presente: boolean }>;
+  /**
+   * Presença de cada professor da turma nesta lição. Uma turma pode ter mais
+   * de um professor, por isso a presença não cabe no par
+   * `professor`/`professorPresente` da ficha.
+   */
+  teachers: Array<{ id: string; user: number; professorNome: string; presente: boolean }>;
 };
 
 export type ProfessorRankingItem = {
@@ -1008,6 +1014,12 @@ function mapAttendanceSheet(item: any): AttendanceSheet {
       alunoNome: r.aluno_nome,
       presente: Boolean(r.presente),
     })),
+    teachers: (item.teachers ?? []).map((t: any) => ({
+      id: String(t.id),
+      user: Number(t.user),
+      professorNome: t.professor_nome ?? "",
+      presente: Boolean(t.presente),
+    })),
   };
 }
 
@@ -1045,7 +1057,11 @@ export async function saveAttendanceRegistration(payload: {
       body: JSON.stringify({
         status: payload.status,
         professor: payload.professor ?? null,
-        professor_presente: payload.professorPresente ?? false,
+        // Omitido de propósito quando não informado: a chamada dos alunos não
+        // pode sobrescrever o que foi marcado na frequência dos professores.
+        ...(payload.professorPresente !== undefined
+          ? { professor_presente: payload.professorPresente }
+          : {}),
         visitantes: payload.visitantes,
         biblias: payload.biblias,
         revistas: payload.revistas,
@@ -1060,9 +1076,23 @@ export async function saveAttendanceRegistration(payload: {
   return mapAttendanceSheet(data);
 }
 
-export async function fetchAttendanceSheets(): Promise<AttendanceSheet[]> {
-  const data = await request<unknown>("/attendance-sheets/");
-  const items = getResults<any>(data);
+/**
+ * Busca as fichas de chamada. Passe `lesson` para trazer só as da lição —
+ * sem filtro, uma igreja com muitas lições precisaria baixar tudo. Segue
+ * todas as páginas: antes só a primeira era lida, e a ficha da lição aberta
+ * simplesmente não aparecia depois de ~20 fichas.
+ */
+export async function fetchAttendanceSheets(filters?: {
+  lesson?: string;
+  classGroup?: string;
+}): Promise<AttendanceSheet[]> {
+  const params = new URLSearchParams();
+  if (filters?.lesson) params.set("lesson", filters.lesson);
+  if (filters?.classGroup) params.set("class_group", filters.classGroup);
+  const query = params.toString();
+  const items = await requestAllPages<any>(
+    query ? `/attendance-sheets/?${query}` : "/attendance-sheets/",
+  );
   return items.map(mapAttendanceSheet);
 }
 
@@ -1126,6 +1156,26 @@ export async function updateAttendanceSheet(
   const data = await request<any>(`/attendance-sheets/${sheetId}/`, {
     method: "PATCH",
     body: JSON.stringify(body),
+  });
+  return mapAttendanceSheet(data);
+}
+
+/**
+ * Salva a frequência de vários professores da turma numa única requisição.
+ * Upsert por professor: quem não vai no payload fica como está.
+ */
+export async function saveAttendanceTeachers(
+  sheetId: string,
+  teachers: Array<{ user: number; presente: boolean }>,
+) {
+  const data = await request<any>(`/attendance-sheets/${sheetId}/teachers/`, {
+    method: "POST",
+    body: JSON.stringify({
+      teachers: teachers.map((teacher) => ({
+        user: Number(teacher.user),
+        presente: teacher.presente,
+      })),
+    }),
   });
   return mapAttendanceSheet(data);
 }
@@ -2102,6 +2152,7 @@ export const attendanceApi = {
   createAttendanceSheet,
   updateAttendanceSheet,
   saveAttendanceRecords,
+  saveAttendanceTeachers,
   ensureAttendanceSheet,
 };
 

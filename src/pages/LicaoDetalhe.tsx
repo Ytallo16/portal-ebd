@@ -135,9 +135,9 @@ export default function LicaoDetalhe() {
   });
 
   const { data: sheets = [] } = useQuery({
-    queryKey: orgQueryKey(activeOrgId, "attendance-sheets"),
-    queryFn: fetchAttendanceSheets,
-    enabled: podeCarregarOperacional && visaoSecretario,
+    queryKey: orgQueryKey(activeOrgId, "attendance-sheets", lessonId),
+    queryFn: () => fetchAttendanceSheets({ lesson: lessonId! }),
+    enabled: podeCarregarOperacional && visaoSecretario && Boolean(lessonId),
   });
 
   const podeEscalarProfessores =
